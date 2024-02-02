@@ -1,0 +1,24 @@
+version: '3.8'
+services:
+  grafana:
+    image: grafana/grafana
+    ports:
+      - ${GRAFANA_PORT}:3000
+    restart: unless-stopped
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - grafana-plugins:/var/lib/grafana/plugins
+      - grafana-provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+    # extra_hosts:
+    #   - 'host.docker.internal:${HOST_IP}'
+
+volumes:
+  grafana-data:
+    driver: local
+  grafana-plugins:
+    driver: local
+  grafana-provisioning:
+    driver: local
