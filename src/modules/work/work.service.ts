@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
-const workspacePath = path.resolve(__dirname, '../workspace');
+const workspacePath = path.resolve(process.cwd(), 'workspace');
 
-import { parse, parser } from 'csv';
-import { promisify } from 'util';
-import { AppRepository } from './app.repository';
+import { WorkRepository } from './work.repository';
+
+import { parse } from 'csv';
 
 @Injectable()
-export class AppService {
-  constructor(private readonly repository: AppRepository) {}
+export class WorkService {
+  constructor(private readonly repository: WorkRepository) {}
   getHello(): string {
     return 'Hello World!';
   }

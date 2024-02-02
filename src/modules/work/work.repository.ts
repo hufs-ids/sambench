@@ -1,21 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
-const workspacePath = path.resolve(__dirname, '../workspace');
+const workspacePath = path.resolve(process.cwd(), 'workspace');
 
-import { parse, parser } from 'csv';
-import { promisify } from 'util';
+import { parse } from 'csv';
 
 @Injectable()
-export class AppRepository {
-  constructor() {
-    this.test();
-  }
-
-  async test() {
-    console.log(await this.getWorkPercents('cherry-pick'));
-  }
-
+export class WorkRepository {
   async getWorkPercents(workId: string) {
     const workPath = path.resolve(workspacePath, workId);
     const files = await fs.promises.readdir(workPath, { withFileTypes: true });

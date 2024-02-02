@@ -1,0 +1,2 @@
+SELECT _video_codec_type, _size, duration, capture_framerate, width, height, color_standard, color_transfer FROM files WHERE ((((is_pending=0 AND NOT _modifier=4) OR (is_pending=1 AND lower(_data) NOT REGEXP '.*/\.pending-(\d+)-([^/]+)$' AND owner_package_name IN ( 'com.android.providers.media.module' )))) AND (is_trashed=0) AND (volume_name IN ( 'external_primary' ))) AND ((_data='/storage/emulated/0/DCIM/Target-90.0/02833/test-3.jpeg' and mime_type not like 'null'));
+

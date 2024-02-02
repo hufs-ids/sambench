@@ -1,13 +1,12 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { LoggerMiddleware } from './middleware/logger.middleware';
-import { AppRepository } from './app.repository';
+import { AdbModule } from './modules/adb/adb.module';
+import { HostModule } from './modules/host/host.module';
+import { WorkModule } from './modules/work/work.module';
+
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 
 @Module({
-  imports: [],
-  controllers: [AppController],
-  providers: [AppService, AppRepository],
+  imports: [AdbModule, HostModule, WorkModule],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

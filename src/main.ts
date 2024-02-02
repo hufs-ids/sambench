@@ -1,18 +1,19 @@
-import { NestFactory } from '@nestjs/core';
+import { env } from './utils/env';
 import { AppModule } from './app.module';
+
 import {
   INestApplication,
   NestApplicationOptions,
   ValidationPipe,
 } from '@nestjs/common';
-import { env } from './utils/env';
+import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as fs from 'fs';
 import * as path from 'path';
 
 function getPackageDetails() {
   const packageJson = JSON.parse(
-    fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8'),
+    fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8'),
   );
   const { name, description, version } = packageJson;
   return { name, description, version };
