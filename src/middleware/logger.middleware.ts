@@ -9,6 +9,7 @@ export class LoggerMiddleware implements NestMiddleware {
     const { ip, method, originalUrl } = req;
     res.on('finish', () => {
       const { statusCode } = res;
+      if (originalUrl === '/adb/metrics') return;
       this.logger.log(`${method} ${statusCode} - ${originalUrl} - ${ip}`);
     });
     next();

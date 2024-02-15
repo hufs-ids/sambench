@@ -1,6 +1,7 @@
+import { TaskDto } from './dto/task.dto';
 import { WorkService } from './work.service';
 
-import { Controller, Get, Param } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('work')
@@ -28,6 +29,23 @@ export class WorkController {
     return this.appService.getWorkAndroidTime(workId);
   }
 
+  @Get('works/:workId/host/time')
+  getWorkHostTime(@Param('workId') workId: string) {
+    return this.appService.getWorkHostTime(workId);
+  }
+
+  /**
+   * VDBE 정보를 가져옵니다.
+   */
+  @Get('works/:workId/tasks/:taskId/queries/:queryId/vdbe')
+  getVdbe(
+    @Param('workId') workId: string,
+    @Param('taskId') taskId: string,
+    @Param('queryId') queryId: string,
+  ) {
+    return this.appService.getVdbeProfile({ workId, taskId, queryId });
+  }
+
   @Get('test')
   test() {
     return [
@@ -43,5 +61,35 @@ export class WorkController {
       { percentage: 90, a: 210, b: 240 },
       { percentage: 100, a: 220, b: 250 },
     ];
+  }
+
+  /**
+   * 작업을 수행합니다.
+   */
+  @Post('works')
+  doWork(
+    @Query('percentageInterval') percentageInterval: number,
+    @Query('percentageTo') percentageTo: number,
+  ) {
+    return this.appService.doWork({
+      percentageInterval,
+      percentageTo,
+    });
+  }
+  /**
+   * Task를 수행합니다.
+   */
+  @Post('works/:workId/tasks/:taskId')
+  doTask(
+    @Param('workId') workId: string,
+    @Param('taskId') taskId: string,
+    @Body() body: TaskDto,
+  ) {
+    console.log(body);
+    return this.appService.doTask({
+      workId,
+      taskId,
+      queries: body.queries,
+    });
   }
 }

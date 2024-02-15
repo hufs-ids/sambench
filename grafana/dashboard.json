@@ -38,7 +38,7 @@
     {
       "datasource": {
         "type": "marcusolsson-json-datasource",
-        "uid": "bb96c22b-7c66-4e9e-94ad-270391cc0065"
+        "uid": "bec1861b-e811-4698-bfa9-1c26af74f3e8"
       },
       "fieldConfig": {
         "defaults": {
@@ -118,7 +118,7 @@
           "cacheDurationSeconds": 300,
           "datasource": {
             "type": "marcusolsson-json-datasource",
-            "uid": "bb96c22b-7c66-4e9e-94ad-270391cc0065"
+            "uid": "bec1861b-e811-4698-bfa9-1c26af74f3e8"
           },
           "fields": [
             {
@@ -146,7 +146,7 @@
     {
       "datasource": {
         "type": "marcusolsson-json-datasource",
-        "uid": "bb96c22b-7c66-4e9e-94ad-270391cc0065"
+        "uid": "bec1861b-e811-4698-bfa9-1c26af74f3e8"
       },
       "fieldConfig": {
         "defaults": {
@@ -226,7 +226,7 @@
           "cacheDurationSeconds": 300,
           "datasource": {
             "type": "marcusolsson-json-datasource",
-            "uid": "bb96c22b-7c66-4e9e-94ad-270391cc0065"
+            "uid": "bec1861b-e811-4698-bfa9-1c26af74f3e8"
           },
           "fields": [
             {
@@ -255,7 +255,7 @@
     {
       "datasource": {
         "type": "marcusolsson-json-datasource",
-        "uid": "bb96c22b-7c66-4e9e-94ad-270391cc0065"
+        "uid": "bec1861b-e811-4698-bfa9-1c26af74f3e8"
       },
       "fieldConfig": {
         "defaults": {
@@ -335,7 +335,7 @@
           "cacheDurationSeconds": 300,
           "datasource": {
             "type": "marcusolsson-json-datasource",
-            "uid": "bb96c22b-7c66-4e9e-94ad-270391cc0065"
+            "uid": "bec1861b-e811-4698-bfa9-1c26af74f3e8"
           },
           "fields": [
             {
@@ -377,7 +377,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "a1866b5c-48f1-4a0e-937c-37ac89c2a657"
+        "uid": "b00226f2-55f7-4a96-8468-a98fa56249b3"
       },
       "fieldConfig": {
         "defaults": {
@@ -456,7 +456,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "a1866b5c-48f1-4a0e-937c-37ac89c2a657"
+            "uid": "b00226f2-55f7-4a96-8468-a98fa56249b3"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -476,7 +476,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "a1866b5c-48f1-4a0e-937c-37ac89c2a657"
+        "uid": "b00226f2-55f7-4a96-8468-a98fa56249b3"
       },
       "fieldConfig": {
         "defaults": {
@@ -558,7 +558,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "a1866b5c-48f1-4a0e-937c-37ac89c2a657"
+            "uid": "b00226f2-55f7-4a96-8468-a98fa56249b3"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -574,7 +574,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "a1866b5c-48f1-4a0e-937c-37ac89c2a657"
+            "uid": "b00226f2-55f7-4a96-8468-a98fa56249b3"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -591,7 +591,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "a1866b5c-48f1-4a0e-937c-37ac89c2a657"
+            "uid": "b00226f2-55f7-4a96-8468-a98fa56249b3"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -613,7 +613,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "a1866b5c-48f1-4a0e-937c-37ac89c2a657"
+        "uid": "b00226f2-55f7-4a96-8468-a98fa56249b3"
       },
       "fieldConfig": {
         "defaults": {
@@ -693,7 +693,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "a1866b5c-48f1-4a0e-937c-37ac89c2a657"
+            "uid": "b00226f2-55f7-4a96-8468-a98fa56249b3"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -709,7 +709,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "a1866b5c-48f1-4a0e-937c-37ac89c2a657"
+            "uid": "b00226f2-55f7-4a96-8468-a98fa56249b3"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -741,7 +741,7 @@
         },
         "datasource": {
           "type": "marcusolsson-json-datasource",
-          "uid": "bb96c22b-7c66-4e9e-94ad-270391cc0065"
+          "uid": "bec1861b-e811-4698-bfa9-1c26af74f3e8"
         },
         "definition": "$.[*]",
         "hide": 0,

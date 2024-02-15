@@ -7,7 +7,7 @@ import { parse } from 'csv';
 
 @Injectable()
 export class WorkRepository {
-  async getWorkPercents(workId: string) {
+  async getTasks(workId: string) {
     const workPath = path.resolve(workspacePath, workId);
     const files = await fs.promises.readdir(workPath, { withFileTypes: true });
     const percents = files
@@ -18,9 +18,9 @@ export class WorkRepository {
 
   async getWorkQueries(workId: string) {
     const workPath = path.resolve(workspacePath, workId);
-    const percents = await fs.promises.readdir(workPath);
+    const tasks = await fs.promises.readdir(workPath);
     const queries = new Set<string>();
-    for (const percent of percents) {
+    for (const percent of tasks) {
       try {
         const queryPath = path.join(workPath, percent);
         const files = await fs.promises.readdir(queryPath);
@@ -37,23 +37,31 @@ export class WorkRepository {
   async readAndroidQueryTime(workId: string, percent: string, query: string) {
     const queryPath = path.resolve(workspacePath, workId, percent, query);
     try {
-      // CSV 파일 읽기
-      const data = await fs.readFileSync(
-        path.join(queryPath, 'time.csv'),
-        'utf-8',
+      const data = await this.readJson(
+        path.join(queryPath, 'android-time.json'),
       );
 
-      // 데이터를 파싱하는 Promise를 반환
-      const res = (await this.parseCsv(data))[0];
-
-      Object.keys(res).forEach((key) => {
-        res[key] = Number(res[key]);
-      });
-
-      return res;
+      return data;
     } catch (err) {
       return null;
     }
+  }
+
+  async readHostQueryTime(workId: string, percent: string, query: string) {
+    const queryPath = path.resolve(workspacePath, workId, percent, query);
+    try {
+      const data = await this.readJson(path.join(queryPath, 'host-time.json'));
+
+      return data;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  async readJson(path: string) {
+    const raw = await fs.readFileSync(path, 'utf-8');
+
+    return JSON.parse(raw);
   }
 
   async parseCsv(data: string) {

@@ -12,8 +12,8 @@ services:
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
-    # extra_hosts:
-    #   - 'host.docker.internal:${HOST_IP}'
+    extra_hosts:
+      - 'host.docker.internal:${HOST_IP}'
   grafana:
     image: grafana/grafana
     depends_on:
@@ -28,8 +28,8 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
-    # extra_hosts:
-    #   - 'host.docker.internal:${HOST_IP}'
+    extra_hosts:
+      - 'host.docker.internal:${HOST_IP}'
 
 volumes:
   prometheus-data:

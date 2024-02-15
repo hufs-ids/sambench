@@ -1,5 +1,5 @@
 {
-  "name": "android-sqlite-performence-visualizer",
+  "name": "android-sqlite-performence-council",
   "version": "0.0.1",
   "description": "",
   "author": "",
@@ -9,6 +9,7 @@
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
+    "start:pm2": "pm2 start yarn --name aspc -- start:dev --preserveWatchOutput",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
@@ -28,6 +29,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "csv": "^6.3.6",
+    "date-fns": "^3.3.1",
     "dotenv": "^16.4.1",
     "envalid": "^8.0.0",
     "reflect-metadata": "^0.1.13",

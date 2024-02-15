@@ -1,13 +1,14 @@
+import { AndroidPath, sourcesPath } from '../../utils/const';
+
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import ADB from 'appium-adb';
+import { format } from 'date-fns';
+import * as fs from 'fs';
 import * as path from 'path';
-
-const sourcesPath = path.resolve(process.cwd(), 'sources');
-const workspacePath = path.resolve(process.cwd(), 'workspace');
 
 @Injectable()
 export class AdbService implements OnModuleInit {
-  private adb?: ADB;
+  adb?: ADB;
 
   async onModuleInit() {
     this.adb = await ADB.createADB({});
@@ -65,11 +66,10 @@ export class AdbService implements OnModuleInit {
 
     const res = await this.adb.shell('df /storage/emulated/0');
 
-    const lines = res.split('');
-    const lastLine = lines[lines.length - 1];
-    const parts = lastLine.split(/\s+/);
-    const used = Number(parts[2]);
-    const available = Number(parts[3]);
+    const splited = res.split(/ +/g).filter((t) => t.length > 0);
+
+    const used = Number(splited[8]);
+    const available = Number(splited[9]);
     return (used / (used + available)) * 100;
   }
 
@@ -91,6 +91,60 @@ export class AdbService implements OnModuleInit {
     }
 
     return i;
+  }
+
+  async pushFile(localPath: string, remotePath: string) {
+    if (!this.adb) {
+      throw new Error('adb is not initialized');
+    }
+
+    await this.adb.push(localPath, remotePath);
+  }
+
+  async pullFile(remotePath: string, localPath: string) {
+    if (!this.adb) {
+      throw new Error('adb is not initialized');
+    }
+
+    await this.adb.pull(remotePath, localPath);
+  }
+
+  async pullFileSu(remotePath: string, localPath: string) {
+    if (!this.adb) {
+      throw new Error('adb is not initialized');
+    }
+
+    const folder = path.dirname(localPath);
+    await fs.promises.mkdir(folder, { recursive: true });
+
+    const tmpPath = `/sdcard/tmp-${Math.floor(Math.random() * 10000)}.db`;
+    await this.shellSu(`sqlite3 ${remotePath} ".clone ${tmpPath}"`);
+    await this.adb.pull(`${tmpPath}`, localPath);
+    await this.shellSu(`rm ${tmpPath}`);
+  }
+
+  async shell(command: string) {
+    if (!this.adb) {
+      throw new Error('adb is not initialized');
+    }
+
+    return this.adb.shell(command);
+  }
+
+  async shellSu(command: string) {
+    if (!this.adb) {
+      throw new Error('adb is not initialized');
+    }
+
+    return await this.adb.shell(`echo '${command}' | su`);
+  }
+
+  async dropCache() {
+    if (!this.adb) {
+      throw new Error('adb is not initialized');
+    }
+
+    await this.shellSu('echo 3 > /proc/sys/vm/drop_caches');
   }
 
   async getMetrics() {
@@ -122,10 +176,13 @@ export class AdbService implements OnModuleInit {
     };
     disk.percent = (disk.used / (disk.used + disk.available)) * 100;
 
+    const pendingCount = await this.getCountOfPending();
+
     return this.convertToJsonPrometheusMetrics({
       cpu,
       mem,
       disk,
+      pendingCount,
     });
   }
 
@@ -157,6 +214,80 @@ disk_available ${data.disk.available}
 # HELP disk_usage_percent 디스크 사용률
 # TYPE disk_usage_percent gauge
 disk_usage_percent ${data.disk.percent}
+
+# HELP pending_count 디스크 사용률
+# TYPE pending_count gauge
+pending_count ${data.pendingCount}
 `;
+  }
+
+  async copyBatchOfImages(repeat = 10) {
+    for (let i = 0; i < repeat; i++) {
+      const timestamp = format(new Date(), 'yyyyMMdd-HHmmss');
+      await this.adb.shell(
+        `mkdir -p /storage/emulated/0/DCIM/batch-${timestamp}`,
+      );
+      await this.adb.shell(
+        `cp -r /storage/emulated/0/DCIM/batch/. /storage/emulated/0/DCIM/batch-${timestamp}/`,
+      );
+    }
+  }
+
+  async removeImages(second = 3) {
+    try {
+      await this.adb.shell(
+        `timeout ${second} rm -rf /storage/emulated/0/DCIM/batch-*`,
+      );
+    } catch (e) {}
+  }
+
+  async fillStorage(targetPercent: number) {
+    let currentPercent = await this.getStoragePercentage();
+    let diff = targetPercent - currentPercent;
+    let unchangedCount = 0;
+
+    while (diff > 0) {
+      await this.copyBatchOfImages();
+      const newPercent = await this.getStoragePercentage();
+      console.log('[Fill Storage]', 'newPercent', newPercent);
+      if (newPercent === currentPercent) {
+        unchangedCount++;
+        if (unchangedCount >= 10) {
+          throw new Error('스토리지 증가가 10번 연속으로 확인되지 않았습니다.');
+        }
+      } else {
+        unchangedCount = 0;
+      }
+      currentPercent = newPercent;
+      diff = targetPercent - currentPercent;
+    }
+  }
+
+  async drainStorage(targetPercent: number) {
+    let currentPercent = await this.getStoragePercentage();
+    let diff = currentPercent - targetPercent;
+    let unchangedCount = 0;
+
+    while (diff > 0) {
+      await this.removeImages(3);
+      const newPercent = await this.getStoragePercentage();
+      console.log('[Drain Storage]', 'newPercent', newPercent);
+      if (newPercent === currentPercent) {
+        unchangedCount++;
+        if (unchangedCount >= 10) {
+          throw new Error('스토리지 감소가 10번 연속으로 확인되지 않았습니다.');
+        }
+      } else {
+        unchangedCount = 0;
+      }
+      currentPercent = newPercent;
+      diff = currentPercent - targetPercent;
+    }
+  }
+
+  async getCountOfPending() {
+    return await this.shellSu(
+      `echo "SELECT COUNT(*) FROM images WHERE is_pending = 1;" | sqlite3 ${AndroidPath.ExternalDB}`,
+    );
   }
 }

@@ -10,6 +10,7 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as fs from 'fs';
 import * as path from 'path';
+import { MyLogger } from './logger/logger';
 
 function getPackageDetails() {
   const packageJson = JSON.parse(
@@ -57,6 +58,7 @@ async function appFactory(module: any, options?: NestApplicationOptions) {
 async function bootstrap() {
   const app = await appFactory(AppModule, {
     bufferLogs: true,
+    logger: new MyLogger(),
   });
 
   // Swagger
