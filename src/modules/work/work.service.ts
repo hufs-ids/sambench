@@ -95,6 +95,42 @@ export class WorkService {
     return ret;
   }
 
+  async getVdbeProfile({
+    workId,
+    queryId,
+  }: {
+    workId: string;
+    queryId: string;
+  }) {
+    try {
+      const tasks = await this.repository.getTasks(workId);
+
+      const ret = [];
+
+      for (const task of tasks) {
+        const vdbePath = path.resolve(
+          workspacePath,
+          workId,
+          `${task}`,
+          queryId,
+          'vdbe-profile.json',
+        );
+        const raw = await fs.promises.readFile(vdbePath, 'utf-8');
+        const data = JSON.parse(raw);
+
+        ret.push({
+          task,
+          ...data,
+        });
+      }
+
+      return ret;
+    } catch (err) {
+      console.error(`Error reading the VDBe profile file: ${err}`);
+      throw new Error(`Could not read the VDBe profile file: ${err}`);
+    }
+  }
+
   async getTask(workId: string, taskId: string): Promise<any> {
     const taskPath = path.resolve(workspacePath, workId, taskId);
     const files = await fs.promises.readdir(taskPath);
@@ -102,22 +138,15 @@ export class WorkService {
     for (const file of files) {
       const stats = await fs.promises.stat(path.join(taskPath, file));
       if (stats.isDirectory()) {
-        fileObj[file] = await this.getQueries(workId, taskId, file);
+        // fileObj[file] = await this.getQueries(workId, taskId, file);
+        // todo
       }
     }
     return fileObj;
   }
 
-  async getQueries(workId: string, taskId: string, queryId: string) {
-    return {
-      queryId,
-      host: {
-        vdbeProfile: await this.readHostVdbeProfile(workId, taskId, queryId),
-      },
-      android: {
-        time: await this.readAndroidQueryTime(workId, taskId, queryId),
-      },
-    };
+  async getQueries(workId: string) {
+    return await this.repository.getWorkQueries(workId);
   }
 
   async readAndroidQueryTime(workId: string, taskId: string, queryId: string) {
@@ -218,20 +247,11 @@ export class WorkService {
     });
   }
 
-  async getVdbeProfile({
-    workId,
-    taskId,
-    queryId,
-  }: {
-    workId: string;
-    taskId: string;
-    queryId: string;
-  }) {
-    const queryPath = path.resolve(workspacePath, workId, taskId, queryId);
-    const vdbeProfilePath = path.join(queryPath, 'vdbe_profile.out');
+  async parseVdbeProfile(vdbePath: string) {
+    const queryWorkspacePath = path.resolve(vdbePath, '..');
     try {
-      const data = await fs.promises.readFile(vdbeProfilePath, 'utf-8');
-      return data
+      const data = await fs.promises.readFile(vdbePath, 'utf-8');
+      const ret = data
         .split('\n')
         .filter((t) => t.charAt(0) !== '-')
         .map((t) => {
@@ -247,6 +267,8 @@ export class WorkService {
           };
         })
         .reduce((acc, cur) => {
+          if (!cur.key) return acc;
+
           if (acc[cur.key]) {
             acc[cur.key] += cur.value;
           } else {
@@ -254,11 +276,15 @@ export class WorkService {
           }
           return acc;
         }, {});
+
+      fs.promises.writeFile(
+        path.join(queryWorkspacePath, 'vdbe-profile.json'),
+        JSON.stringify(ret),
+        'utf-8',
+      );
     } catch (err) {
       console.error(`Error reading the VDBe profile file: ${err}`);
-      throw new Error(
-        `Could not read the VDBe profile file at ${vdbeProfilePath}`,
-      );
+      throw new Error(`Could not read the VDBe profile file at ${vdbePath}`);
     }
   }
 
@@ -399,33 +425,27 @@ export class WorkService {
   //
   async doQueryOnHost(workId: string, taskId: string, queryId: string) {
     console.log(`[Host] Query for ${queryId}`);
-    const sqlitePath = path.resolve(
-      workspacePath,
-      workId,
-      taskId,
-      'external.db',
-    );
+    const taskPath = path.resolve(workspacePath, workId, taskId);
+    const queryWorkspacePath = path.resolve(taskPath, queryId);
+    const sqlitePath = path.resolve(taskPath, 'external.db');
     const queryPath = path.resolve(sourcesPath, 'queries', queryId);
+    const hostTimePath = path.resolve(queryWorkspacePath, 'host-time.json');
+
     const ret = child_process.execSync(
-      `((echo -e ".eqp on\\n.scanstats on\\n" ; cat ${queryPath}) | time sqlite3 ${sqlitePath}) 2>&1 | tail -n 2`,
+      `cd ${queryWorkspacePath} ; ((echo -e ".eqp on\\n.scanstats on\\n" ; cat ${queryPath}) | time sqlite3 ${sqlitePath}) 2>&1 | tail -n 2`,
       { shell: '/bin/bash' },
     );
 
     const times = this.parseHostTime(ret.toString());
-
-    const hostTimePath = path.resolve(
-      workspacePath,
-      workId,
-      taskId,
-      queryId,
-      'host-time.json',
-    );
 
     await fs.promises.mkdir(path.dirname(hostTimePath), {
       recursive: true,
     });
     await fs.promises.writeFile(hostTimePath, JSON.stringify(times), 'utf-8');
 
-    // todo: vdbe profile 측정
+    // vdbe profile 측정
+    await this.parseVdbeProfile(
+      path.join(queryWorkspacePath, 'vdbe_profile.out'),
+    );
   }
 }

@@ -24,6 +24,11 @@ export class WorkController {
     return this.appService.getWork(workId);
   }
 
+  @Get('works/:workId/queries')
+  getQueries(@Param('workId') workId: string) {
+    return this.appService.getQueries(workId);
+  }
+
   @Get('works/:workId/android/time')
   getWorkAndroidTime(@Param('workId') workId: string) {
     return this.appService.getWorkAndroidTime(workId);
@@ -37,13 +42,9 @@ export class WorkController {
   /**
    * VDBE 정보를 가져옵니다.
    */
-  @Get('works/:workId/tasks/:taskId/queries/:queryId/vdbe')
-  getVdbe(
-    @Param('workId') workId: string,
-    @Param('taskId') taskId: string,
-    @Param('queryId') queryId: string,
-  ) {
-    return this.appService.getVdbeProfile({ workId, taskId, queryId });
+  @Get('works/:workId/queries/:queryId/vdbe')
+  getVdbe(@Param('workId') workId: string, @Param('queryId') queryId: string) {
+    return this.appService.getVdbeProfile({ workId, queryId });
   }
 
   @Get('test')

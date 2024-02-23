@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 3,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -82,7 +82,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -111,7 +112,8 @@
         "tooltip": {
           "mode": "single",
           "sort": "none"
-        }
+        },
+        "xField": "task"
       },
       "targets": [
         {
@@ -190,7 +192,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -219,7 +222,8 @@
         "tooltip": {
           "mode": "single",
           "sort": "none"
-        }
+        },
+        "xField": "task"
       },
       "targets": [
         {
@@ -233,18 +237,18 @@
               "jsonPath": "$[*]"
             }
           ],
-          "hide": true,
           "method": "GET",
           "queryParams": "",
           "refId": "A",
-          "urlPath": "/works/$work/android/time"
+          "urlPath": "/works/$work/host/time"
         }
       ],
-      "title": "Host Query Time (작업중)",
+      "title": "Host Query Time",
       "transformations": [
         {
           "id": "extractFields",
           "options": {
+            "keepTime": false,
             "replace": true,
             "source": "*"
           }
@@ -263,14 +267,14 @@
             "mode": "palette-classic"
           },
           "custom": {
-            "axisBorderShow": false,
+            "axisBorderShow": true,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 100,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -279,6 +283,9 @@
             },
             "insertNulls": false,
             "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
@@ -295,11 +302,13 @@
             }
           },
           "mappings": [],
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -307,9 +316,27 @@
               }
             ]
           },
-          "unitScale": true
+          "unit": "locale",
+          "unitScale": false
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "task"
+            },
+            "properties": [
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 100
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -322,17 +349,19 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom",
+          "placement": "right",
           "showLegend": true
         },
         "tooltip": {
           "mode": "single",
           "sort": "none"
-        }
+        },
+        "xField": "task"
       },
+      "pluginVersion": "10.3.3",
       "targets": [
         {
-          "cacheDurationSeconds": 300,
+          "cacheDurationSeconds": 0,
           "datasource": {
             "type": "marcusolsson-json-datasource",
             "uid": "bec1861b-e811-4698-bfa9-1c26af74f3e8"
@@ -342,18 +371,18 @@
               "jsonPath": "$[*]"
             }
           ],
-          "hide": true,
           "method": "GET",
           "queryParams": "",
           "refId": "A",
-          "urlPath": "/works/$work/android/time"
+          "urlPath": "/works/$work/queries/$query/vdbe"
         }
       ],
-      "title": "VDBE Profile (작업중)",
+      "title": "VDBE Profile",
       "transformations": [
         {
           "id": "extractFields",
           "options": {
+            "keepTime": false,
             "replace": true,
             "source": "*"
           }
@@ -392,7 +421,7 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
-            "fillOpacity": 0,
+            "fillOpacity": 25,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -401,7 +430,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "linear",
-            "lineWidth": 1,
+            "lineWidth": 2,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -421,7 +450,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -487,6 +517,7 @@
             "axisBorderShow": true,
             "axisCenteredZero": false,
             "axisColorMode": "text",
+            "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
@@ -518,11 +549,14 @@
             }
           },
           "mappings": [],
+          "max": 100,
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -530,7 +564,7 @@
               }
             ]
           },
-          "unit": "kbytes",
+          "unit": "percent",
           "unitScale": true
         },
         "overrides": []
@@ -562,48 +596,14 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "disk_available",
-          "fullMetaSearch": false,
-          "includeNullMetadata": true,
-          "instant": false,
-          "legendFormat": "Available",
-          "range": true,
-          "refId": "A",
-          "useBackend": false
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "b00226f2-55f7-4a96-8468-a98fa56249b3"
-          },
-          "disableTextWrap": false,
-          "editorMode": "builder",
-          "expr": "disk_used",
+          "expr": "disk_usage_percent",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
           "instant": false,
           "legendFormat": "Used",
           "range": true,
-          "refId": "B",
-          "useBackend": false
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "b00226f2-55f7-4a96-8468-a98fa56249b3"
-          },
-          "disableTextWrap": false,
-          "editorMode": "builder",
-          "exemplar": false,
-          "expr": "disk_usage_percent",
-          "fullMetaSearch": false,
-          "hide": false,
-          "includeNullMetadata": true,
-          "instant": false,
-          "legendFormat": "Percentate",
-          "range": true,
-          "refId": "C",
+          "refId": "A",
           "useBackend": false
         }
       ],
@@ -637,7 +637,10 @@
             },
             "insertNulls": false,
             "lineInterpolation": "linear",
-            "lineWidth": 1,
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 2,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -657,7 +660,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -668,7 +672,20 @@
           "unit": "decbytes",
           "unitScale": true
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Used"
+            },
+            "properties": [
+              {
+                "id": "custom.fillOpacity",
+                "value": 25
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -726,9 +743,115 @@
       ],
       "title": "Memory Usage",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "b00226f2-55f7-4a96-8468-a98fa56249b3"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": true,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "hue",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "none",
+          "unitScale": true
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 18
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "b00226f2-55f7-4a96-8468-a98fa56249b3"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "pending_count",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "Used",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Pending Count",
+      "type": "timeseries"
     }
   ],
-  "refresh": "5s",
+  "refresh": "30s",
   "schemaVersion": 39,
   "tags": [],
   "templating": {
@@ -736,8 +859,8 @@
       {
         "current": {
           "selected": false,
-          "text": "cherry-pick",
-          "value": "cherry-pick"
+          "text": "20240219-xmp-test",
+          "value": "20240219-xmp-test"
         },
         "datasource": {
           "type": "marcusolsson-json-datasource",
@@ -765,6 +888,39 @@
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "q1.sql",
+          "value": "q1.sql"
+        },
+        "datasource": {
+          "type": "marcusolsson-json-datasource",
+          "uid": "bec1861b-e811-4698-bfa9-1c26af74f3e8"
+        },
+        "definition": "$.[*]",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "query",
+        "options": [],
+        "query": {
+          "cacheDurationSeconds": 300,
+          "fields": [
+            {
+              "jsonPath": "$.[*]"
+            }
+          ],
+          "method": "GET",
+          "queryParams": "",
+          "urlPath": "/works/$work/queries"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
       }
     ]
   },
@@ -776,6 +932,6 @@
   "timezone": "",
   "title": "Dashboard",
   "uid": "ef65d611-b39a-42fc-89f4-e1efbe9a63ab",
-  "version": 9,
+  "version": 12,
   "weekStart": ""
 }

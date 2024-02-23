@@ -73,24 +73,54 @@ export class AdbService implements OnModuleInit {
     return (used / (used + available)) * 100;
   }
 
-  async generateStorageBatch(batches = 100) {
+  async generateStorageBatch(
+    batches = 100,
+    {
+      imgRatio = 0.1,
+      xmpRatio = 0.1,
+    }: {
+      imgRatio?: number;
+      xmpRatio?: number;
+    },
+  ) {
+    const ratioSum = imgRatio + xmpRatio;
+
+    const sources = ['img.jpeg', 'xmp.jpg'];
+
+    const sourcesRatio = [imgRatio, xmpRatio];
+
+    const sourceCounts: { [key in string]: number } = {};
+
+    sources.forEach((source, i) => {
+      sourceCounts[source] = Math.round((sourcesRatio[i] / ratioSum) * batches);
+    });
+
     if (!this.adb) {
       throw new Error('adb is not initialized');
     }
 
-    const localPath = path.resolve(sourcesPath, 'img.jpeg');
-    await this.adb.push(localPath, '/storage/emulated/0/DCIM/source.jpeg');
-
-    await this.adb.shell('rm -rf /storage/emulated/0/DCIM/batch');
-    await this.adb.shell('mkdir -p /storage/emulated/0/DCIM/batch');
-    let i = 0;
-    for (; i < batches; i++) {
-      await this.adb.shell(
-        `cp /storage/emulated/0/DCIM/source.jpeg /storage/emulated/0/DCIM/batch/${i}.jpeg`,
+    // 선택된 코드를 재작성합니다.
+    for (const source of sources) {
+      await this.adb.push(
+        path.resolve(sourcesPath, source),
+        `/storage/emulated/0/DCIM/${source}`,
       );
     }
 
-    return i;
+    await this.adb.shell('rm -rf /storage/emulated/0/DCIM/batch');
+    await this.adb.shell('mkdir -p /storage/emulated/0/DCIM/batch');
+
+    for (const source in sourceCounts) {
+      const count = sourceCounts[source];
+      for (let i = 0; i < count; i++) {
+        const indexString = i.toString().padStart(3, '0');
+        await this.adb.shell(
+          `cp /storage/emulated/0/DCIM/${source} /storage/emulated/0/DCIM/batch/${indexString}-${source}`,
+        );
+      }
+    }
+
+    return sourceCounts;
   }
 
   async pushFile(localPath: string, remotePath: string) {
@@ -178,11 +208,14 @@ export class AdbService implements OnModuleInit {
 
     const pendingCount = await this.getCountOfPending();
 
+    const imageCount = await this.getCountOfImages();
+
     return this.convertToJsonPrometheusMetrics({
       cpu,
       mem,
       disk,
       pendingCount,
+      imageCount,
     });
   }
 
@@ -215,20 +248,25 @@ disk_available ${data.disk.available}
 # TYPE disk_usage_percent gauge
 disk_usage_percent ${data.disk.percent}
 
-# HELP pending_count 디스크 사용률
+# HELP pending_count pending_count
 # TYPE pending_count gauge
 pending_count ${data.pendingCount}
+
+# HELP image_count image_count
+# TYPE image_count gauge
+image_count ${data.imageCount}
 `;
   }
 
   async copyBatchOfImages(repeat = 10) {
     for (let i = 0; i < repeat; i++) {
       const timestamp = format(new Date(), 'yyyyMMdd-HHmmss');
-      await this.adb.shell(
-        `mkdir -p /storage/emulated/0/DCIM/batch-${timestamp}`,
-      );
-      await this.adb.shell(
-        `cp -r /storage/emulated/0/DCIM/batch/. /storage/emulated/0/DCIM/batch-${timestamp}/`,
+      await this.shellSu(
+        [
+          `mkdir -p /storage/emulated/0/DCIM/batch-${timestamp}`,
+          `sleep 1`,
+          `cp -r /storage/emulated/0/DCIM/batch/. /storage/emulated/0/DCIM/batch-${timestamp}`,
+        ].join(' && '),
       );
     }
   }
@@ -289,5 +327,27 @@ pending_count ${data.pendingCount}
     return await this.shellSu(
       `echo "SELECT COUNT(*) FROM images WHERE is_pending = 1;" | sqlite3 ${AndroidPath.ExternalDB}`,
     );
+  }
+
+  async getCountOfImages() {
+    return await this.shellSu(
+      `echo "SELECT COUNT(*) FROM images;" | sqlite3 ${AndroidPath.ExternalDB}`,
+    );
+  }
+
+  async forcePendingTo0() {
+    return await this.shellSu(
+      `echo "UPDATE files SET is_pending = 0 WHERE is_pending = 1;" | sqlite3 ${AndroidPath.ExternalDB}`,
+    );
+  }
+
+  async broadcastRefresh() {
+    return await this.shell(
+      'am broadcast -a android.intent.action.MEDIA_MOUNTED -d file:///sdcard',
+    );
+  }
+
+  async reboot() {
+    return await this.adb.reboot();
   }
 }

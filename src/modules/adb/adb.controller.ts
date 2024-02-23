@@ -34,8 +34,15 @@ export class AdbController {
   }
 
   @Post('storage/generate-batch')
-  async generateStorageBatch(@Query('count') count: number) {
-    const totalCount = await this.adbService.generateStorageBatch(count);
+  async generateStorageBatch(
+    @Query('count') count: number,
+    @Query('imgRatio') imgRatio: number,
+    @Query('xmpRatio') xmpRatio: number,
+  ) {
+    const totalCount = await this.adbService.generateStorageBatch(count, {
+      imgRatio,
+      xmpRatio,
+    });
 
     return {
       count: totalCount,
@@ -60,5 +67,30 @@ export class AdbController {
   @Get('count-of-pending')
   getCountOfPending() {
     return this.adbService.getCountOfPending();
+  }
+
+  @Get('count-of-images')
+  getCountOfImages() {
+    return this.adbService.getCountOfImages();
+  }
+
+  @Post('force-pending-to-0')
+  forcePendingTo0() {
+    return this.adbService.forcePendingTo0();
+  }
+
+  @Post('drop-cache')
+  dropCache() {
+    return this.adbService.dropCache();
+  }
+
+  @Post('broadcast-refresh')
+  broadcastRefresh() {
+    return this.adbService.broadcastRefresh();
+  }
+
+  @Post('reboot')
+  reboot() {
+    return this.adbService.reboot();
   }
 }
