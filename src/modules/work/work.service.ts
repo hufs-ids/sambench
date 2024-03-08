@@ -1,10 +1,9 @@
-import { AdbService } from '../adb/adb.service';
+import { AdbController } from '../adb/adb.controller';
 
 import { WorkRepository } from './work.repository';
 
 import { Injectable } from '@nestjs/common';
 import * as child_process from 'child_process';
-import { parse } from 'csv';
 import { format } from 'date-fns';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -14,40 +13,13 @@ import { AndroidPath, sourcesPath, workspacePath } from 'src/utils/const';
 export class WorkService {
   constructor(
     private readonly repository: WorkRepository,
-    private readonly adb: AdbService,
+    private readonly adb: AdbController,
   ) {}
   getHello(): string {
     return 'Hello World!';
   }
 
   cache = {};
-
-  async getWorks(): Promise<string[]> {
-    const files = await fs.promises.readdir(workspacePath, {
-      withFileTypes: true,
-    });
-    const folders = files
-      .filter((dirent) => dirent.isDirectory())
-      .map((dirent) => dirent.name);
-    return folders;
-  }
-
-  async getWork(workId: string): Promise<any> {
-    if (this.cache[workId]) {
-      return this.cache[workId];
-    }
-    const workPath = path.resolve(workspacePath, workId);
-    const files = await fs.promises.readdir(workPath);
-    const fileObj = {};
-    for (const file of files) {
-      const stats = await fs.promises.stat(path.join(workPath, file));
-      if (stats.isDirectory()) {
-        fileObj[file] = await this.getTask(workId, file);
-      }
-    }
-    this.cache[workId] = fileObj;
-    return fileObj;
-  }
 
   async getWorkAndroidTime(workId: string): Promise<any> {
     const tasks = await this.repository.getTasks(workId);
@@ -69,7 +41,7 @@ export class WorkService {
       ret.push(queryRes);
     }
 
-    return ret;
+    return ret.sort((a, b) => Number(a.task) - Number(b.task));
   }
 
   async getWorkHostTime(workId: string): Promise<any> {
@@ -92,7 +64,7 @@ export class WorkService {
       ret.push(queryRes);
     }
 
-    return ret;
+    return ret.sort((a, b) => Number(a.task) - Number(b.task));
   }
 
   async getVdbeProfile({
@@ -124,127 +96,38 @@ export class WorkService {
         });
       }
 
-      return ret;
+      return ret.sort((a, b) => Number(a.task) - Number(b.task));
     } catch (err) {
       console.error(`Error reading the VDBe profile file: ${err}`);
       throw new Error(`Could not read the VDBe profile file: ${err}`);
     }
   }
 
-  async getTask(workId: string, taskId: string): Promise<any> {
-    const taskPath = path.resolve(workspacePath, workId, taskId);
-    const files = await fs.promises.readdir(taskPath);
-    const fileObj = {};
-    for (const file of files) {
-      const stats = await fs.promises.stat(path.join(taskPath, file));
-      if (stats.isDirectory()) {
-        // fileObj[file] = await this.getQueries(workId, taskId, file);
-        // todo
-      }
-    }
-    return fileObj;
-  }
-
   async getQueries(workId: string) {
     return await this.repository.getWorkQueries(workId);
   }
 
-  async readAndroidQueryTime(workId: string, taskId: string, queryId: string) {
-    const queryPath = path.resolve(workspacePath, workId, taskId, queryId);
-    try {
-      // CSV 파일 읽기
-      const data = await fs.readFileSync(
-        path.join(queryPath, 'time.csv'),
-        'utf-8',
-      );
+  async getExternalDbSizes(workId: string) {
+    const tasks = await this.repository.getTasks(workId);
+    const queries = await this.repository.getWorkQueries(workId);
 
-      // 데이터를 파싱하는 Promise를 반환
-      return new Promise((resolve, reject) => {
-        const records = [];
-        parse(data, {
-          columns: true,
-          skip_empty_lines: true,
-        })
-          .on('readable', function () {
-            let record;
-            while ((record = this.read())) {
-              records.push(record);
-            }
-          })
-          .on('end', () => {
-            resolve(records);
-          })
-          .on('error', reject);
-      });
-    } catch (err) {
-      console.error(err);
-      throw err; // 오류를 다시 throw하여 호출자에게 전달
+    console.log({ tasks, queries });
+
+    const ret = [];
+
+    for (const task of tasks) {
+      const queryRes = {
+        task,
+        size: (
+          await fs.promises.stat(
+            path.resolve(workspacePath, workId, `${task}`, 'external.db'),
+          )
+        ).size,
+      };
+      ret.push(queryRes);
     }
-  }
 
-  async readHostVdbeProfile(workId: string, taskId: string, queryId: string) {
-    const queryPath = path.resolve(workspacePath, workId, taskId, queryId);
-    try {
-      // CSV 파일 읽기
-      const data = await fs.readFileSync(
-        path.join(queryPath, 'vdbe_profile.csv'),
-        'utf-8',
-      );
-
-      this.parseCsv(data);
-
-      // 데이터를 파싱하는 Promise를 반환
-      return new Promise((resolve, reject) => {
-        const records = [];
-        parse(data, {
-          columns: true,
-          skip_empty_lines: true,
-        })
-          .on('readable', function () {
-            let record;
-            while ((record = this.read())) {
-              records.push(record);
-            }
-          })
-          .on('end', () => {
-            resolve(
-              records.reduce((acc, cur) => {
-                acc[cur.key] = cur.value;
-                return acc;
-              }, {}),
-            );
-          })
-          .on('error', reject);
-      });
-    } catch (err) {
-      console.error(err);
-      throw err; // 오류를 다시 throw하여 호출자에게 전달
-    }
-  }
-
-  async parseCsv(data: string) {
-    return new Promise((resolve, reject) => {
-      const records = [];
-      parse(data, {
-        columns: true,
-        skip_empty_lines: true,
-      })
-        .on('readable', function () {
-          let record;
-          while ((record = this.read())) {
-            records.push(record);
-          }
-        })
-        .on('end', () => {
-          resolve(
-            records.reduce((acc, cur) => {
-              acc[cur.key] = cur.value;
-              return acc;
-            }, {}),
-          );
-        })
-        .on('error', reject);
-    });
+    return ret.sort((a, b) => Number(a.task) - Number(b.task));
   }
 
   async parseVdbeProfile(vdbePath: string) {
@@ -299,8 +182,7 @@ export class WorkService {
     const queriesPath = path.join(sourcesPath, 'queries');
     const queries = await fs.promises.readdir(queriesPath);
 
-    await this.adb.shellSu('rm -rf /sdcard/queries');
-    await this.adb.pushFile(path.join(queriesPath), AndroidPath.Query);
+    await this.adb.pushQuery();
 
     const targetIndex = Math.floor(percentageTo / percentageInterval);
 
@@ -325,7 +207,7 @@ export class WorkService {
   }
 
   async exportDB({ workId, taskId }: { workId: string; taskId: string }) {
-    await this.adb.pullFileSu(
+    await this.adb.pullDbFileSu(
       AndroidPath.ExternalDB,
       path.resolve(workspacePath, workId, taskId, 'external.db'),
     );
@@ -341,10 +223,8 @@ export class WorkService {
     queries: string[];
   }) {
     console.log(`Task for ${taskId}%`);
-    // todo: media query reload
-    // todo: cache 비우기
 
-    // host에 external storage 복사
+    this.adb.pushQuery();
 
     await this.exportDB({ workId, taskId });
 
@@ -356,6 +236,8 @@ export class WorkService {
 
   async doQueryOnAndroid(workId: string, taskId: string, queryId: string) {
     console.log(`[Android] Query for ${queryId}`);
+
+    // todo: media query reload
 
     await this.adb.dropCache();
 
@@ -430,6 +312,9 @@ export class WorkService {
     const sqlitePath = path.resolve(taskPath, 'external.db');
     const queryPath = path.resolve(sourcesPath, 'queries', queryId);
     const hostTimePath = path.resolve(queryWorkspacePath, 'host-time.json');
+    await fs.promises.mkdir(queryWorkspacePath, {
+      recursive: true,
+    });
 
     const ret = child_process.execSync(
       `cd ${queryWorkspacePath} ; ((echo -e ".eqp on\\n.scanstats on\\n" ; cat ${queryPath}) | time sqlite3 ${sqlitePath}) 2>&1 | tail -n 2`,
@@ -444,8 +329,15 @@ export class WorkService {
     await fs.promises.writeFile(hostTimePath, JSON.stringify(times), 'utf-8');
 
     // vdbe profile 측정
-    await this.parseVdbeProfile(
-      path.join(queryWorkspacePath, 'vdbe_profile.out'),
+    // await this.parseVdbeProfile(
+    //   path.join(queryWorkspacePath, 'vdbe_profile.out'),
+    // );
+
+    const vdbeProfileDestPath = path.join(
+      queryWorkspacePath,
+      'vdbe_profile.out',
     );
+
+    await this.parseVdbeProfile(vdbeProfileDestPath);
   }
 }

@@ -19,6 +19,6 @@ export class CustomExceptionFilter implements ExceptionFilter {
     this.logger.error(exception);
 
     // 응답을 반환
-    response.status(status).send(exception.stack);
+    response.status(status).send(exception.message + '\n\n' + exception.stack);
   }
 }

@@ -1,14 +1,13 @@
 import { Injectable } from '@nestjs/common';
+import { parse } from 'csv';
 import * as fs from 'fs';
 import * as path from 'path';
-const workspacePath = path.resolve(process.cwd(), 'workspace');
-
-import { parse } from 'csv';
+import { HostPath } from 'src/utils/const';
 
 @Injectable()
 export class WorkRepository {
   async getTasks(workId: string) {
-    const workPath = path.resolve(workspacePath, workId);
+    const workPath = path.resolve(HostPath.Workspace, workId);
     const files = await fs.promises.readdir(workPath, { withFileTypes: true });
     const percents = files
       .filter((file) => file.isDirectory())
@@ -17,7 +16,7 @@ export class WorkRepository {
   }
 
   async getWorkQueries(workId: string) {
-    const workPath = path.resolve(workspacePath, workId);
+    const workPath = path.resolve(HostPath.Workspace, workId);
     const tasks = await fs.promises.readdir(workPath);
     const queries = new Set<string>();
     for (const percent of tasks) {
@@ -35,7 +34,7 @@ export class WorkRepository {
   }
 
   async readAndroidQueryTime(workId: string, percent: string, query: string) {
-    const queryPath = path.resolve(workspacePath, workId, percent, query);
+    const queryPath = path.resolve(HostPath.Workspace, workId, percent, query);
     try {
       const data = await this.readJson(
         path.join(queryPath, 'android-time.json'),
@@ -48,7 +47,7 @@ export class WorkRepository {
   }
 
   async readHostQueryTime(workId: string, percent: string, query: string) {
-    const queryPath = path.resolve(workspacePath, workId, percent, query);
+    const queryPath = path.resolve(HostPath.Workspace, workId, percent, query);
     try {
       const data = await this.readJson(path.join(queryPath, 'host-time.json'));
 
