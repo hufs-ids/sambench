@@ -4,7 +4,6 @@ import {
   Get,
   NotImplementedException,
   Param,
-  Patch,
   Post,
   Put,
   Query,
@@ -17,11 +16,17 @@ import * as path from 'path';
 import { AndroidPath, sourcesPath } from 'src/utils/const';
 import { sleep } from 'src/utils/utils';
 
+/**
+ * Controller for ADB operations.
+ */
 @ApiTags('adb')
 @Controller('adb')
 export class AdbController {
   adb?: ADB;
 
+  /**
+   * Initializes the ADB module on module start.
+   */
   async onModuleInit() {
     this.adb = await ADB.createADB({
       adbExecTimeout: 5 * 60 * 1000,
@@ -34,7 +39,13 @@ export class AdbController {
     this.adb.setDeviceId(devices[0].udid);
   }
 
-  async shell(command: string) {
+  /**
+   * Executes a shell command on the connected device.
+   * @param {string} command The shell command to execute.
+   * @returns The result of the shell command.
+   */
+  @Post('shell')
+  async shell(@Query('command') command: string) {
     if (!this.adb) {
       throw new Error('adb is not initialized');
     }
@@ -42,18 +53,28 @@ export class AdbController {
     return this.adb.shell(command);
   }
 
-  async executeSqliteQuery(query: string) {
+  /**
+   * Executes a SQLite query on the connected device.
+   * @param {string} sql The SQL query to execute.
+   * @returns The result of the SQLite query.
+   */
+  @Post('sqlite')
+  async executeSqliteQuery(@Query('sql') sql: string) {
     if (!this.adb) {
       throw new Error('adb is not initialized');
     }
 
-    const fixedQuery = query.replace(/'/g, '"');
+    const fixedQuery = sql.replace(/'/g, '"');
 
     return this.shell(
       `echo '${fixedQuery}' | sqlite3 ${AndroidPath.ExternalDB}`,
     );
   }
 
+  /**
+   * Retrieves a list of connected devices.
+   * @returns A list of connected devices.
+   */
   @Get('devices')
   async getDevices() {
     if (!this.adb) {
@@ -67,6 +88,10 @@ export class AdbController {
     }));
   }
 
+  /**
+   * Retrieves the selected device ID.
+   * @returns The selected device ID.
+   */
   @Get('devices/selected')
   async getSelectedDeviceId() {
     if (!this.adb) {
@@ -76,6 +101,10 @@ export class AdbController {
     return this.adb.curDeviceId;
   }
 
+  /**
+   * Selects a device by its device ID.
+   * @param {string} deviceId The device ID to select.
+   */
   @Post('devices/:deviceId/select')
   async selectDevice(@Param('deviceId') deviceId: string) {
     if (!this.adb) {
@@ -85,6 +114,9 @@ export class AdbController {
     this.adb.setDeviceId(deviceId);
   }
 
+  /**
+   * Connects to a device over WiFi.
+   */
   @Post('device/connect-over-wifi')
   async connectOverWifi() {
     if (!this.adb) {
@@ -99,6 +131,10 @@ export class AdbController {
     await this.selectDevice(`${ip}:5555`);
   }
 
+  /**
+   * Retrieves the storage percentage used on the device.
+   * @returns The storage percentage used.
+   */
   @Get('storage/percentage')
   async getStoragePercentage() {
     if (!this.adb) {
@@ -114,6 +150,13 @@ export class AdbController {
     return (used / (used + available)) * 100;
   }
 
+  /**
+   * Generates a batch of storage files.
+   * @param {number} batches The number of batches to generate.
+   * @param {number} imgRatio The ratio of image files.
+   * @param {number} xmpRatio The ratio of XMP files.
+   * @returns The count of generated files.
+   */
   @Post('storage/generate-batch')
   async generateStorageBatch(
     @Query('batches') batches: number,
@@ -164,6 +207,10 @@ export class AdbController {
     };
   }
 
+  /**
+   * Copies a batch of images.
+   * @param {number} repeat The number of times to repeat the copy operation.
+   */
   async copyBatchOfImages(repeat = 10) {
     for (let i = 0; i < repeat; i++) {
       const timestamp = format(new Date(), 'yyyyMMdd-HHmmss');
@@ -177,6 +224,10 @@ export class AdbController {
     }
   }
 
+  /**
+   * Fills the storage to a specified percentage by duplicating a batch folder.
+   * @param {number} targetPercent The target storage percentage to fill up to.
+   */
   @Post('storage/fill')
   async fillStorage(@Query('targetPercentage') targetPercent: number) {
     let currentPercent = await this.getStoragePercentage();
@@ -200,6 +251,10 @@ export class AdbController {
     }
   }
 
+  /**
+   * Drains the storage to a specified percentage by removing images from a cloned batch.
+   * @param {number} targetPercent The target storage percentage to drain down to.
+   */
   @Post('storage/drain')
   async removeStorage(@Query('targetPercentage') targetPercent: number) {
     let currentPercent = await this.getStoragePercentage();
@@ -223,6 +278,10 @@ export class AdbController {
     }
   }
 
+  /**
+   * Removes images from the device.
+   * @param {number} second The time in seconds to allow the removal command to run.
+   */
   async removeImages(second = 3) {
     try {
       await this.shell(`timeout ${second} rm -rf /sdcard/DCIM/batch-*`);
@@ -231,16 +290,10 @@ export class AdbController {
 
   isMetric = true;
 
-  @Patch('metrics/on')
-  async metricsOn() {
-    this.isMetric = true;
-  }
-
-  @Patch('metrics/off')
-  async metricsOff() {
-    this.isMetric = false;
-  }
-
+  /**
+   * Returns Prometheus formatted metrics.
+   * @returns Prometheus formatted metrics.
+   */
   @Get('metrics')
   async getMetrics() {
     if (!this.isMetric) return;
@@ -294,6 +347,20 @@ export class AdbController {
     });
   }
 
+  /**
+   * Toggles the metrics on or off.
+   * @param {boolean} isMetric The state to set for metrics.
+   */
+  @Put('metrics')
+  async metricsOn(@Query('isMetric') isMetric: boolean) {
+    this.isMetric = isMetric;
+  }
+
+  /**
+   * Converts the provided data to Prometheus metrics format.
+   * @param {object} data The data to convert.
+   * @returns Prometheus metrics as a string.
+   */
   convertToJsonPrometheusMetrics(data) {
     return `# HELP cpu_usage CPU 사용량
 # TYPE cpu_usage gauge
@@ -345,19 +412,29 @@ fs_image_count ${data.fsImageCount}
 `;
   }
 
+  /**
+   * Retrieves the count of images in the external database.
+   * @returns The count of images.
+   */
   async getExternalDbImageCount() {
-    return await this.shell(
-      `echo "SELECT COUNT(*) FROM images;" | sqlite3 ${AndroidPath.ExternalDB}`,
-    );
+    return await this.executeSqliteQuery(`SELECT COUNT(*) FROM images;`);
   }
 
+  /**
+   * Retrieves the size of the external database.
+   * @returns The size of the database.
+   */
   async getExternalDbSize() {
-    const str = await this.shell(`ls -l ${AndroidPath.ExternalDB}`);
+    const str = await this.executeSqliteQuery(`SELECT COUNT(*) FROM images;`);
     const size = str.split(' ')[4];
 
     return Number(size);
   }
 
+  /**
+   * Retrieves the count of pending images in the external database.
+   * @returns The count of pending images.
+   */
   @Get('external-db/pending-count')
   async getCountOfPending() {
     return await this.executeSqliteQuery(
@@ -365,13 +442,19 @@ fs_image_count ${data.fsImageCount}
     );
   }
 
+  /**
+   * Retrieves the count of images in the external database.
+   * @returns The count of images.
+   */
   @Get('external-db/image-count')
   async getCountOfImages() {
-    return await this.shell(
-      `echo "SELECT COUNT(*) FROM images;" | sqlite3 ${AndroidPath.ExternalDB}`,
-    );
+    return await this.executeSqliteQuery(`SELECT COUNT(*) FROM images;`);
   }
 
+  /**
+   * Retrieves the fragmentation level of the external database.
+   * @returns The fragmentation level.
+   */
   @Get('external-db/fragmentation')
   async getExternalDbFragmentation() {
     const str = await this.shell(
@@ -382,7 +465,7 @@ fs_image_count ${data.fsImageCount}
   }
 
   /**
-   * files 테이블에 대한 트리거를 복구합니다.
+   * Creates a trigger for the files table in the external database.
    */
   @Post('external-db/trigger')
   async createTrigger() {
@@ -392,7 +475,7 @@ fs_image_count ${data.fsImageCount}
   }
 
   /**
-   * files 테이블에 대한 트리거를 제거합니다.
+   * Removes a trigger for the files table in the external database.
    */
   @Delete('external-db/trigger')
   async dropTrigger() {
@@ -401,18 +484,26 @@ fs_image_count ${data.fsImageCount}
     );
   }
 
+  /**
+   * Fragments the external database by updating file records.
+   * @param {number} batch The number of updates per batch.
+   * @param {number} repeat The number of times to repeat the update batches.
+   */
   @Post('external-db/fragmentate')
-  async externalDbFragmentate() {
+  async externalDbFragmentate(
+    @Query('batch') batch: number,
+    @Query('repeat') repeat: number,
+  ) {
     await this.dropTrigger();
 
     try {
-      for (let i = 0; i < 100; i++) {
-        let query = `BEGIN TRANSACTION;`;
+      for (let i = 0; i < repeat; i++) {
+        let query = ''; //`BEGIN TRANSACTION;`;
 
-        for (let j = 0; j < 10; j++) {
+        for (let j = 0; j < batch; j++) {
           query += `UPDATE files SET date_modified = date_modified + 1 WHERE _id = (SELECT _id FROM files ORDER BY RANDOM() LIMIT 1);`;
         }
-        query += `COMMIT;`;
+        // query += `COMMIT;`;
 
         await this.executeSqliteQuery(query);
       }
@@ -421,6 +512,10 @@ fs_image_count ${data.fsImageCount}
     }
   }
 
+  /**
+   * Counts the number of images in the file system's batch directory.
+   * @returns The count of images.
+   */
   @Get('fs/image-count')
   async fsImageCount() {
     if (!this.adb) {
@@ -439,13 +534,19 @@ fs_image_count ${data.fsImageCount}
     return imageCountInBatch * batchCount;
   }
 
+  /**
+   * Forces the pending status of files to 0.
+   */
   @Post('force-pending-to-0')
   async forcePendingTo0() {
-    return await this.shell(
-      `echo "UPDATE files SET is_pending = 0 WHERE is_pending = 1;" | sqlite3 ${AndroidPath.ExternalDB}`,
+    return await this.executeSqliteQuery(
+      `UPDATE files SET is_pending = 0 WHERE is_pending = 1;`,
     );
   }
 
+  /**
+   * Drops the cache on the device.
+   */
   @Post('drop-cache')
   async dropCache() {
     if (!this.adb) {
@@ -455,6 +556,9 @@ fs_image_count ${data.fsImageCount}
     await this.shell('echo 3 > /proc/sys/vm/drop_caches');
   }
 
+  /**
+   * Broadcasts a refresh to the media storage.
+   */
   @Post('broadcast-refresh')
   async broadcastRefresh() {
     return await this.shell(
@@ -462,11 +566,18 @@ fs_image_count ${data.fsImageCount}
     );
   }
 
+  /**
+   * Reboots the device.
+   * @returns The result of the reboot operation.
+   */
   @Post('reboot')
   async reboot() {
     return await this.adb.reboot();
   }
 
+  /**
+   * Pushes a query file to the device.
+   */
   @Put('push-query')
   async pushQuery() {
     if (!this.adb) {
@@ -477,6 +588,12 @@ fs_image_count ${data.fsImageCount}
     await this.pushFile(path.join(sourcesPath, 'queries'), AndroidPath.Query);
   }
 
+  /**
+   * Pushes a file from the local system to the remote device.
+   * @param {string} localPath - The path of the file on the local system.
+   * @param {string} remotePath - The destination path on the remote device.
+   * @throws Will throw an error if adb is not initialized.
+   */
   async pushFile(localPath: string, remotePath: string) {
     if (!this.adb) {
       throw new Error('adb is not initialized');
@@ -485,6 +602,12 @@ fs_image_count ${data.fsImageCount}
     await this.adb.push(localPath, remotePath);
   }
 
+  /**
+   * Pulls a database file from the remote device to the local system using a temporary file.
+   * @param {string} remotePath - The path of the database file on the remote device.
+   * @param {string} localPath - The destination path on the local system.
+   * @throws Will throw an error if adb is not initialized.
+   */
   async pullDbFileSu(remotePath: string, localPath: string) {
     if (!this.adb) {
       throw new Error('adb is not initialized');
@@ -496,13 +619,16 @@ fs_image_count ${data.fsImageCount}
       await fs.promises.mkdir(folder, { recursive: true });
 
       await this.shell(`cp ${remotePath} ${tmpPath}`);
-      // await this.shell(`sqlite3 ${remotePath} ".clone ${tmpPath}"`);
       await this.adb.pull(`${tmpPath}`, localPath);
     } finally {
       await this.shell(`rm ${tmpPath}`);
     }
   }
 
+  /**
+   * Initiates a factory reset on the remote device.
+   * @throws NotImplementedException if the method is not yet implemented.
+   */
   @Post('factory-reset')
   async factoryReset() {
     throw new NotImplementedException('아직 구현중입니다.');

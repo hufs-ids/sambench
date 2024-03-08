@@ -16,6 +16,9 @@ import {
   workspacePath,
 } from 'src/utils/const';
 
+/**
+ * WorkController manages work-related operations.
+ */
 @ApiTags('work')
 @Controller()
 export class WorkController {
@@ -26,11 +29,17 @@ export class WorkController {
 
   cache = {};
 
+  /**
+   * Returns a greeting message.
+   */
   @Get()
   async getHello(): Promise<string> {
     return 'IDS Android Sqllite Performance Council API Server';
   }
 
+  /**
+   * Retrieves a list of all works.
+   */
   @Get('works')
   async getWorks(): Promise<string[]> {
     const files = await fs.promises.readdir(workspacePath, {
@@ -42,6 +51,9 @@ export class WorkController {
     return folders;
   }
 
+  /**
+   * Retrieves details of a specific work by its ID.
+   */
   @Get('works/:workId')
   async getWork(@Param('workId') workId: string): Promise<any> {
     if (this.cache[workId]) {
@@ -60,7 +72,11 @@ export class WorkController {
     return fileObj;
   }
 
-  async getTasks(workId: string) {
+  /**
+   * Retrieves tasks associated with a specific work by its ID.
+   */
+  @Get('works/:workId/tasks')
+  async getTasks(@Param('workId') workId: string) {
     const workPath = path.resolve(HostPath.Workspace, workId);
     const files = await fs.promises.readdir(workPath, { withFileTypes: true });
     const percents = files
@@ -69,6 +85,9 @@ export class WorkController {
     return percents;
   }
 
+  /**
+   * Retrieves a specific task by work ID and task ID.
+   */
   async getTask(workId: string, taskId: string): Promise<any> {
     const taskPath = path.resolve(workspacePath, workId, taskId);
     const files = await fs.promises.readdir(taskPath);
@@ -83,6 +102,9 @@ export class WorkController {
     return fileObj;
   }
 
+  /**
+   * Retrieves queries associated with a specific work by its ID.
+   */
   @Get('works/:workId/queries')
   async getQueries(@Param('workId') workId: string) {
     const workPath = path.resolve(HostPath.Workspace, workId);
@@ -102,6 +124,9 @@ export class WorkController {
     return Array.from(queries.values());
   }
 
+  /**
+   * Retrieves queries for a work by its ID.
+   */
   async getWorkQueries(workId: string) {
     const workPath = path.resolve(HostPath.Workspace, workId);
     const tasks = await fs.promises.readdir(workPath);
@@ -120,6 +145,9 @@ export class WorkController {
     return Array.from(queries.values());
   }
 
+  /**
+   * Retrieves external database sizes for a specific work by its ID.
+   */
   @Get('works/:workId/external-db-sizes')
   async getExternalDbSizes(@Param('workId') workId: string) {
     const tasks = await this.getTasks(workId);
@@ -144,6 +172,9 @@ export class WorkController {
     return ret.sort((a, b) => Number(a.task) - Number(b.task));
   }
 
+  /**
+   * Retrieves Android execution time for a specific work by its ID.
+   */
   @Get('works/:workId/android/time')
   async getWorkAndroidTime(@Param('workId') workId: string) {
     const tasks = await this.getTasks(workId);
@@ -168,6 +199,9 @@ export class WorkController {
     return ret.sort((a, b) => Number(a.task) - Number(b.task));
   }
 
+  /**
+   * Retrieves host execution time for a specific work by its ID.
+   */
   @Get('works/:workId/host/time')
   async getWorkHostTime(@Param('workId') workId: string) {
     const tasks = await this.repository.getTasks(workId);
@@ -193,7 +227,7 @@ export class WorkController {
   }
 
   /**
-   * VDBE 정보를 가져옵니다.
+   * Retrieves VDBE information for a specific work and query by their IDs.
    */
   @Get('works/:workId/queries/:queryId/vdbe')
   async getVdbe(
@@ -229,25 +263,8 @@ export class WorkController {
     }
   }
 
-  @Get('test')
-  async test() {
-    return [
-      { percentage: 0, a: 120, b: 150 },
-      { percentage: 10, a: 130, b: 160 },
-      { percentage: 20, a: 140, b: 170 },
-      { percentage: 30, a: 150, b: 180 },
-      { percentage: 40, a: 160, b: 190 },
-      { percentage: 50, a: 170, b: 200 },
-      { percentage: 60, a: 180, b: 210 },
-      { percentage: 70, a: 190, b: 220 },
-      { percentage: 80, a: 200, b: 230 },
-      { percentage: 90, a: 210, b: 240 },
-      { percentage: 100, a: 220, b: 250 },
-    ];
-  }
-
   /**
-   * 작업을 수행합니다.
+   * Initiates a work process based on specified percentage intervals.
    */
   @Post('works')
   async doWork(
@@ -281,8 +298,9 @@ export class WorkController {
       asdf: 11,
     };
   }
+
   /**
-   * Task를 수행합니다.
+   * Executes a task based on work ID and task ID.
    */
   @Post('works/:workId/tasks/:taskId')
   async doTask(
@@ -303,6 +321,9 @@ export class WorkController {
     }
   }
 
+  /**
+   * Exports the database for a given work and task.
+   */
   async exportDB({ workId, taskId }: { workId: string; taskId: string }) {
     await this.adb.pullDbFileSu(
       AndroidPath.ExternalDB,
@@ -310,6 +331,9 @@ export class WorkController {
     );
   }
 
+  /**
+   * Executes a query on Android for a given work, task, and query ID.
+   */
   async doQueryOnAndroid(workId: string, taskId: string, queryId: string) {
     console.log(`[Android] Query for ${queryId}`);
 
@@ -342,7 +366,7 @@ export class WorkController {
   }
 
   /**
-   * 해당 Work의 Host 작업을 다시 수행합니다.
+   * Re-executes host work for a given work ID.
    */
   @Post('works/:workId/redo-host-work')
   async redoHostWork(@Param('workId') workId: string, @Body() body: TaskDto) {
@@ -397,6 +421,9 @@ export class WorkController {
     }
   }
 
+  /**
+   * Executes a query on the host for a given work, task, and query ID.
+   */
   async doQueryOnHost(workId: string, taskId: string, queryId: string) {
     console.log(`[Host] Query for ${queryId}`);
     const taskPath = path.resolve(workspacePath, workId, taskId);
