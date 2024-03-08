@@ -42,12 +42,16 @@ export class AdbController {
     return this.adb.shell(command);
   }
 
-  async shellSu(command: string) {
+  async executeSqliteQuery(query: string) {
     if (!this.adb) {
       throw new Error('adb is not initialized');
     }
 
-    return await this.adb.shell(`echo '${command}' | su`);
+    const fixedQuery = query.replace(/'/g, '"');
+
+    return this.shell(
+      `echo '${fixedQuery}' | sqlite3 ${AndroidPath.ExternalDB}`,
+    );
   }
 
   @Get('devices')
@@ -132,7 +136,7 @@ export class AdbController {
       throw new Error('adb is not initialized');
     }
 
-    await this.shellSu('mkdir -p /sdcard/DCIM');
+    await this.shell('mkdir -p /sdcard/DCIM');
 
     for (const source of sources) {
       console.log('push', source);
@@ -143,14 +147,14 @@ export class AdbController {
       await sleep(1000);
     }
 
-    await this.shellSu('rm -rf /sdcard/DCIM/batch');
-    await this.shellSu('mkdir -p /sdcard/DCIM/batch');
+    await this.shell('rm -rf /sdcard/DCIM/batch');
+    await this.shell('mkdir -p /sdcard/DCIM/batch');
 
     for (const source in sourceCounts) {
       const count = sourceCounts[source];
       for (let i = 0; i < count; i++) {
         const indexString = i.toString().padStart(3, '0');
-        await this.shellSu(
+        await this.shell(
           `cp /sdcard/DCIM/${source} /sdcard/DCIM/batch/${indexString}-${source}`,
         );
       }
@@ -163,7 +167,7 @@ export class AdbController {
   async copyBatchOfImages(repeat = 10) {
     for (let i = 0; i < repeat; i++) {
       const timestamp = format(new Date(), 'yyyyMMdd-HHmmss');
-      await this.shellSu(
+      await this.shell(
         [
           `mkdir -p /sdcard/DCIM/batch-${timestamp}`,
           `sleep 1`,
@@ -342,13 +346,13 @@ fs_image_count ${data.fsImageCount}
   }
 
   async getExternalDbImageCount() {
-    return await this.shellSu(
+    return await this.shell(
       `echo "SELECT COUNT(*) FROM images;" | sqlite3 ${AndroidPath.ExternalDB}`,
     );
   }
 
   async getExternalDbSize() {
-    const str = await this.shellSu(`ls -l ${AndroidPath.ExternalDB}`);
+    const str = await this.shell(`ls -l ${AndroidPath.ExternalDB}`);
     const size = str.split(' ')[4];
 
     return Number(size);
@@ -356,30 +360,65 @@ fs_image_count ${data.fsImageCount}
 
   @Get('external-db/pending-count')
   async getCountOfPending() {
-    return await this.shellSu(
-      `echo "SELECT COUNT(*) FROM images WHERE is_pending = 1;" | sqlite3 ${AndroidPath.ExternalDB}`,
+    return await this.executeSqliteQuery(
+      `SELECT COUNT(*) FROM images WHERE is_pending = 1;`,
     );
   }
 
   @Get('external-db/image-count')
   async getCountOfImages() {
-    return await this.shellSu(
+    return await this.shell(
       `echo "SELECT COUNT(*) FROM images;" | sqlite3 ${AndroidPath.ExternalDB}`,
     );
   }
 
   @Get('external-db/fragmentation')
   async getExternalDbFragmentation() {
-    const str = await this.shellSu(
+    const str = await this.shell(
       `f2fs.fibmap ${AndroidPath.ExternalDB} | tail -n +17 | wc -l`,
     );
 
     return Number(str);
   }
 
+  /**
+   * files 테이블에 대한 트리거를 복구합니다.
+   */
+  @Post('external-db/trigger')
+  async createTrigger() {
+    return await this.executeSqliteQuery(
+      `CREATE TRIGGER files_update AFTER UPDATE ON files BEGIN SELECT _UPDATE(old.volume_name||':'||old._id||':'||old.media_type||':'||old.is_download||':'||new._id||':'||new.media_type||':'||new.is_download||':'||old.is_trashed||':'||new.is_trashed||':'||old.is_pending||':'||new.is_pending||':'||old.is_favorite||':'||new.is_favorite||':'||ifnull(old._special_format,0)||':'||ifnull(new._special_format,0)||':'||ifnull(old.owner_package_name,'null')||':'||ifnull(new.owner_package_name,'null')||':'||old._data); END;`,
+    );
+  }
+
+  /**
+   * files 테이블에 대한 트리거를 제거합니다.
+   */
+  @Delete('external-db/trigger')
+  async dropTrigger() {
+    return await this.executeSqliteQuery(
+      `DROP TRIGGER IF EXISTS files_update;`,
+    );
+  }
+
   @Post('external-db/fragmentate')
   async externalDbFragmentate() {
-    throw new NotImplementedException();
+    await this.dropTrigger();
+
+    try {
+      for (let i = 0; i < 100; i++) {
+        let query = `BEGIN TRANSACTION;`;
+
+        for (let j = 0; j < 10; j++) {
+          query += `UPDATE files SET date_modified = date_modified + 1 WHERE _id = (SELECT _id FROM files ORDER BY RANDOM() LIMIT 1);`;
+        }
+        query += `COMMIT;`;
+
+        await this.executeSqliteQuery(query);
+      }
+    } finally {
+      await this.createTrigger();
+    }
   }
 
   @Get('fs/image-count')
@@ -402,7 +441,7 @@ fs_image_count ${data.fsImageCount}
 
   @Post('force-pending-to-0')
   async forcePendingTo0() {
-    return await this.shellSu(
+    return await this.shell(
       `echo "UPDATE files SET is_pending = 0 WHERE is_pending = 1;" | sqlite3 ${AndroidPath.ExternalDB}`,
     );
   }
@@ -413,27 +452,13 @@ fs_image_count ${data.fsImageCount}
       throw new Error('adb is not initialized');
     }
 
-    await this.shellSu('echo 3 > /proc/sys/vm/drop_caches');
+    await this.shell('echo 3 > /proc/sys/vm/drop_caches');
   }
 
   @Post('broadcast-refresh')
   async broadcastRefresh() {
     return await this.shell(
       'am broadcast -a android.intent.action.MEDIA_MOUNTED -d file:///sdcard',
-    );
-  }
-
-  @Post('trigger')
-  async createTrigger() {
-    return await this.shellSu(
-      `echo "CREATE TRIGGER files_update AFTER UPDATE ON files BEGIN SELECT _UPDATE(old.volume_name||':'||old._id||':'||old.media_type||':'||old.is_download||':'||new._id||':'||new.media_type||':'||new.is_download||':'||old.is_trashed||':'||new.is_trashed||':'||old.is_pending||':'||new.is_pending||':'||old.is_favorite||':'||new.is_favorite||':'||ifnull(old._special_format,0)||':'||ifnull(new._special_format,0)||':'||ifnull(old.owner_package_name,'null')||':'||ifnull(new.owner_package_name,'null')||':'||old._data); END;" | sqlite3 ${AndroidPath.ExternalDB}`,
-    );
-  }
-
-  @Delete('trigger')
-  async dropTrigger() {
-    return await this.shellSu(
-      `echo "DROP TRIGGER IF EXISTS files_update;" | sqlite3 ${AndroidPath.ExternalDB}`,
     );
   }
 
@@ -448,7 +473,7 @@ fs_image_count ${data.fsImageCount}
       throw new Error('adb is not initialized');
     }
 
-    await this.shellSu('rm -rf /sdcard/queries');
+    await this.shell('rm -rf /sdcard/queries');
     await this.pushFile(path.join(sourcesPath, 'queries'), AndroidPath.Query);
   }
 
@@ -470,11 +495,11 @@ fs_image_count ${data.fsImageCount}
       const folder = path.dirname(localPath);
       await fs.promises.mkdir(folder, { recursive: true });
 
-      await this.shellSu(`cp ${remotePath} ${tmpPath}`);
-      // await this.shellSu(`sqlite3 ${remotePath} ".clone ${tmpPath}"`);
+      await this.shell(`cp ${remotePath} ${tmpPath}`);
+      // await this.shell(`sqlite3 ${remotePath} ".clone ${tmpPath}"`);
       await this.adb.pull(`${tmpPath}`, localPath);
     } finally {
-      await this.shellSu(`rm ${tmpPath}`);
+      await this.shell(`rm ${tmpPath}`);
     }
   }
 

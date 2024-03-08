@@ -1,11 +1,10 @@
-import { HostService } from './host.service';
-
-import { Module } from '@nestjs/common';
 import { HostController } from './host.controller';
 
+import { Module } from '@nestjs/common';
+
 @Module({
-  providers: [HostService],
-  exports: [HostService],
   controllers: [HostController],
+  providers: [HostController],
+  exports: [HostController],
 })
 export class HostModule {}
