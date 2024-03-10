@@ -313,7 +313,7 @@ export class WorkController {
 
     this.adb.pushQuery();
 
-    await this.exportDB({ workId, taskId });
+    await this.exportDB(workId, taskId);
 
     for (const queryId of queries) {
       await this.doQueryOnAndroid(workId, taskId, queryId);
@@ -324,8 +324,12 @@ export class WorkController {
   /**
    * Exports the database for a given work and task.
    */
-  async exportDB({ workId, taskId }: { workId: string; taskId: string }) {
-    await this.adb.pullDbFileSu(
+  @Post('works/:workId/tasks/:taskId/export-db')
+  async exportDB(
+    @Param('workId') workId: string,
+    @Param('taskId') taskId: string,
+  ) {
+    await this.adb.pullFile(
       AndroidPath.ExternalDB,
       path.resolve(workspacePath, workId, taskId, 'external.db'),
     );

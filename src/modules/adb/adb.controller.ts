@@ -8,12 +8,12 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiQuery, ApiTags } from '@nestjs/swagger';
 import ADB from 'appium-adb';
 import { format } from 'date-fns';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AndroidPath, sourcesPath } from 'src/utils/const';
+import { AndroidPath, HostPath, sourcesPath } from 'src/utils/const';
 import { sleep } from 'src/utils/utils';
 
 /**
@@ -601,27 +601,50 @@ fs_image_count ${data.fsImageCount}
 
     await this.adb.push(localPath, remotePath);
   }
-
   /**
    * Pulls a database file from the remote device to the local system using a temporary file.
-   * @param {string} remotePath - The path of the database file on the remote device.
-   * @param {string} localPath - The destination path on the local system.
+   * @param {string} androidPath - The path of the database file on the remote device.
+   * @param {string} hostPath - The destination path on the local system.
    * @throws Will throw an error if adb is not initialized.
    */
-  async pullDbFileSu(remotePath: string, localPath: string) {
+  @Post('pull-db-file')
+  @ApiQuery({
+    name: 'androidPath',
+    required: true,
+    description: 'The path of the database file on the android device.',
+    example: AndroidPath.ExternalDB,
+  })
+  @ApiQuery({
+    name: 'hostPath',
+    required: true,
+    description: 'The destination path on the host system.',
+    example: `${HostPath.Workspace}/external.db`,
+  })
+  async pullFile(
+    @Query('androidPath') androidPath: string,
+    @Query('hostPath') hostPath: string,
+  ) {
     if (!this.adb) {
       throw new Error('adb is not initialized');
     }
 
-    const tmpPath = `/sdcard/tmp-${Math.floor(Math.random() * 10000)}.db`;
+    const tmpPath = `/sdcard/tmp-${Math.floor(Math.random() * 10000)}`;
     try {
-      const folder = path.dirname(localPath);
+      console.log('1', hostPath);
+      const folder = path.dirname(hostPath);
+      console.log('2', folder);
       await fs.promises.mkdir(folder, { recursive: true });
+      console.log('3');
 
-      await this.shell(`cp ${remotePath} ${tmpPath}`);
-      await this.adb.pull(`${tmpPath}`, localPath);
+      await this.shell(`cp ${androidPath} ${tmpPath}`);
+      console.log('4');
+      await this.adb.pull(`${tmpPath}`, hostPath);
+      console.log('5');
+    } catch (e) {
+      console.error(e);
+      return e;
     } finally {
-      await this.shell(`rm ${tmpPath}`);
+      await this.shell(`if [ -f ${tmpPath} ]; then rm ${tmpPath}; fi`);
     }
   }
 
