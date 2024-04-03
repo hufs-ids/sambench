@@ -1,3 +1,5 @@
+import { WorkRepository } from '../work/work.repository';
+
 import {
   Controller,
   Delete,
@@ -10,19 +12,27 @@ import {
 } from '@nestjs/common';
 import { ApiQuery, ApiTags } from '@nestjs/swagger';
 import ADB from 'appium-adb';
+import * as child_process from 'child_process';
 import { format } from 'date-fns';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AndroidPath, HostPath, sourcesPath } from 'src/utils/const';
+import {
+  AndroidPath,
+  HostPath,
+  sourcesPath,
+  workspacePath,
+} from 'src/utils/const';
 import { sleep } from 'src/utils/utils';
 
 /**
  * Controller for ADB operations.
  */
-@ApiTags('adb')
+@ApiTags('MISC-adb')
 @Controller('adb')
 export class AdbController {
   adb?: ADB;
+
+  constructor(private readonly repository: WorkRepository) {}
 
   /**
    * Initializes the ADB module on module start.
@@ -32,11 +42,16 @@ export class AdbController {
       adbExecTimeout: 5 * 60 * 1000,
     });
 
+    await this.adbInitalize();
+  }
+
+  @Post('initalize')
+  async adbInitalize() {
     await this.adb.root();
 
     const devices = await this.adb.getConnectedDevices();
 
-    this.adb.setDeviceId(devices[0].udid);
+    if (devices[0].udid) this.adb.setDeviceId(devices[0].udid);
   }
 
   /**
@@ -69,6 +84,60 @@ export class AdbController {
     return this.shell(
       `echo '${fixedQuery}' | sqlite3 ${AndroidPath.ExternalDB}`,
     );
+  }
+
+  /**
+   * Executes a SQLite query on the connected device.
+   * @param {string} sql The SQL query to execute.
+   * @returns The result of the SQLite query.
+   */
+  @Post('sqlite/benchmark')
+  async executeSqliteQueryBenchmark(@Query('sql') sql: string) {
+    if (!this.adb) {
+      throw new Error('adb is not initialized');
+    }
+
+    // 연결된 기기에서 호스트로 DB 파일을 가져옵니다.
+    const dbPathOnDevice = `${AndroidPath.ExternalDB}`;
+    const dbPathOnHost = path.resolve(HostPath.Workspace, 'temp.db');
+    await this.adb.pull(dbPathOnDevice, dbPathOnHost);
+    const vdbeProfilePath = path.resolve(
+      HostPath.Workspace,
+      'vdbe_profile.out',
+    );
+
+    try {
+      const fixedQuery = sql.replace(/'/g, '"');
+
+      const androidShellCommand = `(echo '${fixedQuery}' | time sqlite3 ${AndroidPath.ExternalDB}) 2>&1`;
+      const androidResult = await this.shell(androidShellCommand);
+
+      // 호스트에서 sqlite3를 실행하여 쿼리를 수행합니다.
+      const hostShellCommand = `(cd ${workspacePath} ; echo 3 > /proc/sys/vm/drop_caches ; ((echo -e '.eqp on\\n.scanstats on\\n' ; echo '${fixedQuery}') | time sqlite3 ${dbPathOnHost})) 2>&1`;
+      const hostResult = child_process
+        .execSync(hostShellCommand, { shell: '/bin/bash' })
+        .toString();
+
+      // vdbe.out을 분석합니다.
+      const vdbe = await this.repository.parseVdbeProfile(vdbeProfilePath);
+
+      // 결과를 반환합니다.
+      return {
+        android: {
+          shell: androidShellCommand,
+          result: androidResult,
+        },
+        host: {
+          shell: hostShellCommand,
+          result: hostResult,
+          vdbe,
+        },
+      };
+    } finally {
+      // 호스트에서 사용한 DB 파일을 삭제합니다.
+      fs.unlinkSync(dbPathOnHost);
+      fs.unlinkSync(vdbeProfilePath);
+    }
   }
 
   /**
@@ -279,6 +348,20 @@ export class AdbController {
   }
 
   /**
+   * Adjusts the storage to a specified percentage.
+   */
+  @Post('storage/adjust')
+  async adjustStorage(@Query('targetPercentage') targetPercent: number) {
+    const currentPercent = await this.getStoragePercentage();
+    const diff = targetPercent - currentPercent;
+    if (diff > 0) {
+      await this.fillStorage(targetPercent);
+    } else if (diff < 0) {
+      await this.removeStorage(targetPercent);
+    }
+  }
+
+  /**
    * Removes images from the device.
    * @param {number} second The time in seconds to allow the removal command to run.
    */
@@ -294,6 +377,7 @@ export class AdbController {
    * Returns Prometheus formatted metrics.
    * @returns Prometheus formatted metrics.
    */
+
   @Get('metrics')
   async getMetrics() {
     if (!this.isMetric) return;
@@ -327,7 +411,7 @@ export class AdbController {
 
     const pendingCount = await this.getCountOfPending();
 
-    const externalDbImageCount = await this.getExternalDbImageCount();
+    const externalDbImageCount = await this.getCountOfImages();
 
     const externalDbSize = await this.getExternalDbSize();
 
@@ -413,22 +497,15 @@ fs_image_count ${data.fsImageCount}
   }
 
   /**
-   * Retrieves the count of images in the external database.
-   * @returns The count of images.
-   */
-  async getExternalDbImageCount() {
-    return await this.executeSqliteQuery(`SELECT COUNT(*) FROM images;`);
-  }
-
-  /**
    * Retrieves the size of the external database.
    * @returns The size of the database.
    */
+  @Get('external-db/size')
   async getExternalDbSize() {
-    const str = await this.executeSqliteQuery(`SELECT COUNT(*) FROM images;`);
-    const size = str.split(' ')[4];
+    const str = await this.shell(`du -b ${AndroidPath.ExternalDB}`);
+    const size = str.split('\t')[0];
 
-    return Number(size);
+    return size;
   }
 
   /**
@@ -489,6 +566,8 @@ fs_image_count ${data.fsImageCount}
    * @param {number} batch The number of updates per batch.
    * @param {number} repeat The number of times to repeat the update batches.
    */
+
+  /*
   @Post('external-db/fragmentate')
   async externalDbFragmentate(
     @Query('batch') batch: number,
@@ -496,20 +575,106 @@ fs_image_count ${data.fsImageCount}
   ) {
     await this.dropTrigger();
 
+    await sleep(1000);
+
     try {
       for (let i = 0; i < repeat; i++) {
-        let query = ''; //`BEGIN TRANSACTION;`;
+        let query = `BEGIN TRANSACTION;`;
 
         for (let j = 0; j < batch; j++) {
           query += `UPDATE files SET date_modified = date_modified + 1 WHERE _id = (SELECT _id FROM files ORDER BY RANDOM() LIMIT 1);`;
         }
-        // query += `COMMIT;`;
+        query += `COMMIT;`;
 
         await this.executeSqliteQuery(query);
+      }
+
+      // for (let i = 0; i < repeat; i++) {
+      //   const query = `BEGIN TRANSACTION;
+      //   WITH RECURSIVE counter(n) AS (
+      //     SELECT 1
+      //     UNION ALL
+      //     SELECT n+1 FROM counter LIMIT ${batch}
+      //   )
+      //   UPDATE files SET date_modified = date_modified + 1
+      //   WHERE _id IN (
+      //     SELECT _id FROM files ORDER BY RANDOM() LIMIT 1
+      //   );
+      //   COMMIT;`;
+
+      //   await this.executeSqliteQuery(query);
+      // }
+    } finally {
+      await this.createTrigger();
+    }
+  }
+  */
+
+  @Post('external-db/fragmentate')
+  async externalDbFragmentate(
+    @Query('batch') batch: number,
+    @Query('repeat') repeat: number,
+  ) {
+    await this.dropTrigger();
+
+    await sleep(1000);
+
+    try {
+      for (let i = 0; i < repeat; i++) {
+        const queries = [
+          `UPDATE local_metadata SET generation = generation;`,
+
+          `UPDATE android_metadata SET locale = locale;`,
+
+          `UPDATE thumbnails SET _data = _data, image_id = image_id, kind = kind, width = width, height = height WHERE _id = _id;`,
+
+          `UPDATE album_art SET _data = _data WHERE album_id = album_id;`,
+
+          `UPDATE videothumbnails SET _data = _data, video_id = video_id, kind = kind, width = width, height = height WHERE _id = _id;`,
+
+          `UPDATE files SET _data = _data, _size = _size, format = format, parent = parent, date_added = date_added, date_modified = date_modified, mime_type = mime_type, title = title, description = description, _display_name = _display_name, picasa_id = picasa_id, orientation = orientation, latitude = latitude, longitude = longitude, datetaken = datetaken, mini_thumb_magic = mini_thumb_magic, bucket_id = bucket_id, bucket_display_name = bucket_display_name, isprivate = isprivate, title_key = title_key, artist_id = artist_id, album_id = album_id, composer = composer, track = track, year = year, is_ringtone = is_ringtone, is_music = is_music, is_alarm = is_alarm, is_notification = is_notification, is_podcast = is_podcast, album_artist = album_artist, duration = duration, bookmark = bookmark, artist = artist, album = album, resolution = resolution, tags = tags, category = category, language = language, mini_thumb_data = mini_thumb_data, name = name, media_type = media_type, old_id = old_id, is_drm = is_drm, width = width, height = height, title_resource_uri = title_resource_uri, owner_package_name = owner_package_name, color_standard = color_standard, color_transfer = color_transfer, color_range = color_range, _hash = _hash, is_pending = is_pending, is_download = is_download, download_uri = download_uri, referer_uri = referer_uri, is_audiobook = is_audiobook, date_expires = date_expires, is_trashed = is_trashed, group_id = group_id, primary_directory = primary_directory, secondary_directory = secondary_directory, document_id = document_id, instance_id = instance_id, original_document_id = original_document_id, relative_path = relative_path, volume_name = volume_name, artist_key = artist_key, album_key = album_key, genre = genre, genre_key = genre_key, genre_id = genre_id, author = author, bitrate = bitrate, capture_framerate = capture_framerate, cd_track_number = cd_track_number, compilation = compilation, disc_number = disc_number, is_favorite = is_favorite, num_tracks = num_tracks, writer = writer, exposure_time = exposure_time, f_number = f_number, iso = iso, scene_capture_type = scene_capture_type, generation_added = generation_added, generation_modified = generation_modified, xmp = xmp, _transcode_status = _transcode_status, _video_codec_type = _video_codec_type, _modifier = _modifier, is_recording = is_recording, redacted_uri_id = redacted_uri_id, _user_id = _user_id, _special_format = _special_format WHERE _id = _id;`,
+
+          `UPDATE sqlite_sequence SET name = name, seq = seq;`,
+
+          `UPDATE log SET time = time, message = message;`,
+
+          `UPDATE deleted_media SET old_id = old_id, generation_modified = generation_modified WHERE _id = _id;`,
+
+          `UPDATE audio_playlists_map SET audio_id = audio_id, playlist_id = playlist_id, play_order = play_order WHERE _id = _id;`,
+        ];
+
+        for (let j = 0; j < batch; j++) {
+          // Select a random update query from the list for each batch operation
+          const randomQuery =
+            queries[Math.floor(Math.random() * queries.length)];
+          let query = `BEGIN TRANSACTION;`;
+          query += randomQuery;
+          query += `COMMIT;`;
+
+          await this.executeSqliteQuery(query);
+        }
       }
     } finally {
       await this.createTrigger();
     }
+  }
+
+  @Post('external-db/pending-count/adjust')
+  async adjustPendingCount(@Query('targetPercent') targetPercent: number) {
+    await this.executeSqliteQuery(
+      `WITH RowCount AS (
+        SELECT CAST(COUNT(*) * ${targetPercent} / 100.0 AS INTEGER) AS TargetCount
+        FROM files
+      ),
+      SelectedRows AS (
+        SELECT _id
+        FROM files, RowCount
+        ORDER BY _id
+        LIMIT (SELECT TargetCount FROM RowCount)
+      )
+      UPDATE files
+      SET is_pending = CASE WHEN _id IN (SELECT _id FROM SelectedRows) THEN 1 ELSE 0 END;`,
+    );
   }
 
   /**
@@ -523,7 +688,7 @@ fs_image_count ${data.fsImageCount}
     }
 
     const imageCountInBatch = Number(
-      await this.adb.shell('ls -l /sdcard/DCIM/batch | wc -l'),
+      await this.adb.shell('ls -l /sdcard/DCIM/batch | tail -n +2 | wc -l'),
     );
 
     const batchCount = Number(
@@ -532,16 +697,6 @@ fs_image_count ${data.fsImageCount}
       ),
     );
     return imageCountInBatch * batchCount;
-  }
-
-  /**
-   * Forces the pending status of files to 0.
-   */
-  @Post('force-pending-to-0')
-  async forcePendingTo0() {
-    return await this.executeSqliteQuery(
-      `UPDATE files SET is_pending = 0 WHERE is_pending = 1;`,
-    );
   }
 
   /**

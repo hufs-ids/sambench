@@ -48,5 +48,8 @@ WHERE
       AND media_type IN (1, 3, 2)
     )
   )
+  AND lower(_data) NOT REGEXP '.*/\.pending-(\d+)-([^/]+)$' -- 두 번째 추가
+  AND lower(_data) NOT REGEXP '.*/\.pending-(\d+)-([^/]+)$'
 ORDER BY
   date_modified DESC;
+

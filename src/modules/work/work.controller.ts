@@ -19,7 +19,7 @@ import {
 /**
  * WorkController manages work-related operations.
  */
-@ApiTags('work')
+@ApiTags('MISC-Evaluate')
 @Controller()
 export class WorkController {
   constructor(
@@ -263,6 +263,38 @@ export class WorkController {
     }
   }
 
+  @Get('works/:workId/queries/:queryId/android-times')
+  async getAndroidTimes(
+    @Param('workId') workId: string,
+    @Param('queryId') queryId: string,
+  ) {
+    const tasks = await this.repository.getTasks(workId);
+
+    const ret = [];
+
+    for (const task of tasks) {
+      const androidTimePath = path.resolve(
+        workspacePath,
+        workId,
+        `${task}`,
+        queryId,
+        'android-time.json',
+      );
+      const raw = await fs.promises.readFile(androidTimePath, 'utf-8');
+      const data = JSON.parse(raw);
+
+      delete data.real;
+
+      ret.push({
+        task,
+        io: data.io,
+        cpu: data.user + data.system,
+      });
+    }
+
+    return ret.sort((a, b) => Number(a.task) - Number(b.task));
+  }
+
   /**
    * Initiates a work process based on specified percentage intervals.
    */
@@ -440,7 +472,7 @@ export class WorkController {
     });
 
     const ret = child_process.execSync(
-      `cd ${queryWorkspacePath} ; ((echo -e ".eqp on\\n.scanstats on\\n" ; cat ${queryPath}) | time sqlite3 ${sqlitePath}) 2>&1 | tail -n 2`,
+      `cd ${queryWorkspacePath} ; echo 3 > /proc/sys/vm/drop_caches ; ((echo -e ".eqp on\\n.scanstats on\\n" ; cat ${queryPath}) | time sqlite3 ${sqlitePath}) 2>&1 | tail -n 2`,
       { shell: '/bin/bash' },
     );
 

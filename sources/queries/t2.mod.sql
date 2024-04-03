@@ -19,4 +19,7 @@ WHERE
     )
     AND (is_trashed = 0)
     AND (volume_name IN ('external_primary'))
-  );
+  )
+  AND lower(_data) NOT REGEXP '.*/\.pending-(\d+)-([^/]+)$' -- 두 번째 추가
+  AND lower(_data) NOT REGEXP '.*/\.pending-(\d+)-([^/]+)$';
+

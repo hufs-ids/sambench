@@ -19,6 +19,8 @@ WHERE
     AND (is_trashed = 0)
     AND (volume_name IN ('external_primary'))
   )
+  AND lower(_data) NOT REGEXP '.*/\.pending-(\d+)-([^/]+)$'
+  AND lower(_data) NOT REGEXP '.*/\.pending-(\d+)-([^/]+)$'
   AND (
     (
       _size > 0

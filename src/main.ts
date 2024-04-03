@@ -29,7 +29,7 @@ type SwaggerOptions = {
 
 function buildSwagger(app: INestApplication, options: SwaggerOptions) {
   const config = new DocumentBuilder()
-    .setTitle(options.title)
+    .setTitle('SAMBench Dashboard')
     .setDescription(options.description)
     .setVersion(options.version)
     .addBearerAuth()

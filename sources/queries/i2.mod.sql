@@ -13,6 +13,8 @@ WHERE
       AND NOT _modifier = 4
     )
   )
+  AND lower(_data) NOT REGEXP '.*/\.pending-(\d+)-([^/]+)$'
+  AND lower(_data) NOT REGEXP '.*/\.pending-(\d+)-([^/]+)$'
   AND (
     (
       owner_package_name IN ('com.instagram.android')
@@ -45,3 +47,4 @@ WHERE
   )
 ORDER BY
   date_added DESC;
+

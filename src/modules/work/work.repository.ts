@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { parse } from 'csv';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as readline from 'readline';
 import { HostPath } from 'src/utils/const';
 
 @Injectable()
@@ -127,42 +128,40 @@ export class WorkRepository {
 
   async parseVdbeProfile(vdbePath: string) {
     const queryWorkspacePath = path.resolve(vdbePath, '..');
-    try {
-      const data = await fs.promises.readFile(vdbePath, 'utf-8');
-      const ret = data
-        .split('\n')
-        .filter((t) => t.charAt(0) !== '-')
-        .map((t) => {
-          // key = splited[4]
-          // index = splited[3]
-          // value = int(splited[1])
+    const stream = fs.createReadStream(vdbePath, 'utf-8');
+    const rl = readline.createInterface({
+      input: stream,
+      crlfDelay: Infinity,
+    });
 
-          const splited = t.split(/ +/g).filter((t) => !!t);
+    const result = {};
 
-          return {
-            key: splited[4],
-            value: Number(splited[1]),
-          };
-        })
-        .reduce((acc, cur) => {
-          if (!cur.key) return acc;
+    for await (const line of rl) {
+      if (line.charAt(0) === '-') continue; // 주석 라인은 건너뛴다
 
-          if (acc[cur.key]) {
-            acc[cur.key] += cur.value;
-          } else {
-            acc[cur.key] = cur.value;
-          }
-          return acc;
-        }, {});
+      const splited = line.split(/ +/g).filter((t) => !!t);
+      if (!splited[4]) continue; // 키가 없는 라인은 건너뛴다
 
-      fs.promises.writeFile(
-        path.join(queryWorkspacePath, 'vdbe-profile.json'),
-        JSON.stringify(ret),
-        'utf-8',
-      );
-    } catch (err) {
-      console.error(`Error reading the VDBe profile file: ${err}`);
-      throw new Error(`Could not read the VDBe profile file at ${vdbePath}`);
+      const key = splited[4];
+      const value = Number(splited[1]);
+
+      if (!isNaN(value)) {
+        // 유효한 숫자인 경우에만 처리
+        if (result[key]) {
+          result[key] += value;
+        } else {
+          result[key] = value;
+        }
+      }
     }
+
+    // 결과를 JSON 파일로 저장
+    await fs.promises.writeFile(
+      path.join(queryWorkspacePath, 'vdbe-profile.json'),
+      JSON.stringify(result),
+      'utf-8',
+    );
+
+    return result;
   }
 }
