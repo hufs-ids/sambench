@@ -1,10 +1,11 @@
-# android-sqlite-performance-visualizer
+# SAMBench
+A comprehensive SQLite benchmark for Android Media access with interactive analysis.
 
 ![dashboard](<docs/dashboard.png>)
 
 ## Introduction
 
-Android의 SQLite 성능을 측정하고, 이를 시각화하는 도구입니다.
+SAMBench offers intuitive web-based dashboards and allows users to evaluate media access performance on different configurations, leveraging media access queries collected from Android applications
 
 ## Dependencies
 
@@ -13,8 +14,22 @@ Android의 SQLite 성능을 측정하고, 이를 시각화하는 도구입니다
 - adb
 - nodejs
 
-## Installation
+## Prerequisite
 
-1. .env.example 파일을 복사하여 .env 파일을 생성하고 내용을 적절히 수정합니다.
-2. `docker-compose up -d` 명령어를 실행하여 prometheus와 grafana를 실행합니다.
-3. `yarn start:dev` 명령어를 실행하여 서버를 실행합니다.
+You need a Linux server and an Android device
+
+## Build and Install
+
+1. Clone the source code
+```
+git clone https://github.com/hufs-ids/sambench.git
+```
+2. Install Grafana and Prometheus
+
+
+## Run
+
+1. Copy the `.env.example` file to create a `.env` file and modify the contents appropriately.
+2. Run `docker-compose up -d` to start Prometheus and Grafana.
+3. Execute `yarn start:dev` to run the server
+
