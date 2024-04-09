@@ -1,7 +1,7 @@
 # SAMBench
 A comprehensive SQLite benchmark for Android Media access with interactive analysis.
 
-![dashboard](<docs/Dashboard.png>)
+![dashboard](<docs/SAMBench_dashboard.png>)
 
 ## Introduction
 
